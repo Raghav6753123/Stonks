@@ -1,166 +1,167 @@
 import { NextResponse } from 'next/server';
 import { getTimeSeries, parseNumber } from '../../lib/twelveData';
 
-function clampOutputSize(value, fallback = 60) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(5, Math.min(200, Math.floor(parsed)));
-}
+/** * Configuration & Constant Mappings 
+ */
+const DEFAULT_LIMIT = 60;
+const LIMIT_BOUNDS = { MIN: 5, MAX: 200 };
 
-function ttlForInterval(interval) {
-  if (interval === '1min') return 120_000;
-  if (interval === '5min') return 180_000;
-  if (interval === '15min') return 300_000;
-  if (interval === '1h') return 900_000;
-  return 3_600_000;
-}
+const CACHE_TTL_MAP = {
+  '1min': 120_000,
+  '5min': 180_000,
+  '15min': 300_000,
+  '1h': 900_000,
+  'default': 3_600_000
+};
 
-function toYahooSymbol(symbol) {
-  if (symbol.endsWith('.NSE')) return symbol.replace(/\.NSE$/, '.NS');
-  return symbol;
-}
+const YAHOO_INTERVAL_MAP = {
+  '1day': '1d',
+  '1week': '1wk',
+  '1month': '1mo'
+};
 
-function toYahooInterval(interval) {
-  if (interval === '1day') return '1d';
-  if (interval === '1week') return '1wk';
-  if (interval === '1month') return '1mo';
-  return interval;
-}
+/** * Utility Helpers 
+ */
+const normalizeLimit = (val, fallback = DEFAULT_LIMIT) => {
+  const num = Number(val);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(LIMIT_BOUNDS.MIN, Math.min(LIMIT_BOUNDS.MAX, Math.floor(num)));
+};
 
-async function getYahooSeries(symbol, range, interval) {
-  const ySymbol = toYahooSymbol(symbol);
-  const yInterval = toYahooInterval(interval);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(yInterval)}&includePrePost=false&events=div%2Csplits`;
+const getTickerForYahoo = (ticker) => ticker.endsWith('.NSE') ? ticker.replace(/\.NSE$/, '.NS') : ticker;
 
-  const res = await fetch(url, {
+const getFrequencyForYahoo = (freq) => YAHOO_INTERVAL_MAP[freq] || freq;
+
+const getCacheDuration = (freq) => CACHE_TTL_MAP[freq] || CACHE_TTL_MAP.default;
+
+/** * Data Fetching Strategy: Yahoo Finance 
+ */
+async function fetchYahooProvider(symbol, range, interval) {
+  const ticker = getTickerForYahoo(symbol);
+  const frequency = getFrequencyForYahoo(interval);
+  const endpoint = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(frequency)}&includePrePost=false&events=div%2Csplits`;
+
+  const response = await fetch(endpoint, {
     cache: 'no-store',
     headers: {
-      'User-Agent': 'stonks-market-server/1.0',
-      Accept: 'application/json',
+      'User-Agent': 'market-data-service/1.1',
+      'Accept': 'application/json',
     },
   });
 
-  if (!res.ok) {
-    throw new Error(`Yahoo history request failed (${res.status})`);
+  if (!response.ok) throw new Error(`Yahoo provider error: ${response.status}`);
+
+  const data = await response.json();
+  const resSet = data?.chart?.result?.[0];
+  const quotes = resSet?.indicators?.quote?.[0];
+  const timeframes = Array.isArray(resSet?.timestamp) ? resSet.timestamp : [];
+
+  if (!resSet || !quotes || timeframes.length === 0) {
+    throw new Error('Yahoo provider returned no data points');
   }
 
-  const payload = await res.json();
-  const result = payload?.chart?.result?.[0];
-  const quote = result?.indicators?.quote?.[0];
-  const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : [];
+  const candles = timeframes
+    .map((ts, i) => {
+      const o = Number(quotes?.open?.[i]);
+      const h = Number(quotes?.high?.[i]);
+      const l = Number(quotes?.low?.[i]);
+      const c = Number(quotes?.close?.[i]);
+      const v = Number(quotes?.volume?.[i]);
 
-  if (!result || !quote || timestamps.length === 0) {
-    throw new Error('Yahoo history returned empty payload');
-  }
-
-  const ohlc = timestamps
-    .map((ts, idx) => {
-      const open = Number(quote?.open?.[idx]);
-      const high = Number(quote?.high?.[idx]);
-      const low = Number(quote?.low?.[idx]);
-      const close = Number(quote?.close?.[idx]);
-      const volume = Number(quote?.volume?.[idx]);
-
-      if (![open, high, low, close].every(Number.isFinite)) return null;
+      if (![o, h, l, c].every(Number.isFinite)) return null;
 
       return {
         datetime: new Date(ts * 1000).toISOString(),
-        open,
-        high,
-        low,
-        close,
-        volume: Number.isFinite(volume) ? volume : 0,
+        open: o,
+        high: h,
+        low: l,
+        close: c,
+        volume: Number.isFinite(v) ? v : 0,
       };
     })
     .filter(Boolean);
 
-  if (ohlc.length === 0) {
-    throw new Error('Yahoo history has no valid OHLC points');
-  }
+  if (candles.length === 0) throw new Error('No valid OHLC records found');
 
   return {
-    ohlc,
-    meta: {
+    candles,
+    metadata: {
       source: 'yahoo-finance',
-      symbol: ySymbol,
+      symbol: ticker,
       range,
-      interval: yInterval,
+      interval: frequency,
     },
   };
 }
 
-export async function GET(req) {
+/** * Main API Route Handler 
+ */
+export async function GET(request) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
+    
+    // Extracting and cleaning parameters
     const symbol = (searchParams.get('symbol') || '').trim().toUpperCase();
     const interval = (searchParams.get('interval') || '1day').trim();
-    const outputsize = clampOutputSize(searchParams.get('outputsize'), 60);
+    const limit = normalizeLimit(searchParams.get('outputsize'));
     const range = (searchParams.get('range') || '3mo').trim();
-    const source = (searchParams.get('source') || 'twelve-data').trim().toLowerCase();
+    const dataSource = (searchParams.get('source') || 'twelve-data').trim().toLowerCase();
 
     if (!symbol) {
-      return NextResponse.json({ error: 'Missing symbol' }, { status: 400 });
+      return NextResponse.json({ error: 'Ticker symbol is required' }, { status: 400 });
     }
 
-    if (source === 'yahoo') {
-      const yahooSeries = await getYahooSeries(symbol, range, interval);
-      const ohlc = yahooSeries.ohlc.slice(-outputsize);
+    // --- Branch 1: Yahoo Finance Source ---
+    if (dataSource === 'yahoo') {
+      const result = await fetchYahooProvider(symbol, range, interval);
+      const slicedCandles = result.candles.slice(-limit);
 
-      return NextResponse.json(
-        {
-          symbol,
-          interval,
-          ohlc,
-          meta: {
-            ...yahooSeries.meta,
-            requestedAt: new Date().toISOString(),
-          },
-        },
-        {
-          status: 200,
-          headers: {
-            'Cache-Control': 'no-store',
-          },
-        }
-      );
-    }
-
-    const series = await getTimeSeries(symbol, interval, outputsize, {
-      ttlMs: ttlForInterval(interval),
-    });
-
-    const ohlc = series.values.map((item) => ({
-      datetime: item.datetime,
-      open: parseNumber(item.open),
-      high: parseNumber(item.high),
-      low: parseNumber(item.low),
-      close: parseNumber(item.close),
-      volume: parseNumber(item.volume),
-    }));
-
-    return NextResponse.json(
-      {
+      return NextResponse.json({
         symbol,
         interval,
-        ohlc,
+        ohlc: slicedCandles,
         meta: {
-          source: 'twelve-data',
-          ...series.meta,
+          ...result.metadata,
           requestedAt: new Date().toISOString(),
-        },
-      },
-      {
-        status: 200,
-        headers: {
-          'Cache-Control': 'no-store',
-        },
-      }
-    );
-  } catch (error) {
-    const message = process.env.NODE_ENV === 'production'
-      ? 'Failed to load chart data'
-      : (error instanceof Error ? error.message : 'Failed to load chart data');
+        }
+      }, { 
+        status: 200, 
+        headers: { 'Cache-Control': 'no-store' } 
+      });
+    }
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    // --- Branch 2: Twelve Data Source ---
+    const rawSeries = await getTimeSeries(symbol, interval, limit, {
+      ttlMs: getCacheDuration(interval),
+    });
+
+    const formattedCandles = rawSeries.values.map((point) => ({
+      datetime: point.datetime,
+      open: parseNumber(point.open),
+      high: parseNumber(point.high),
+      low: parseNumber(point.low),
+      close: parseNumber(point.close),
+      volume: parseNumber(point.volume),
+    }));
+
+    return NextResponse.json({
+      symbol,
+      interval,
+      ohlc: formattedCandles,
+      meta: {
+        source: 'twelve-data',
+        ...rawSeries.meta,
+        requestedAt: new Date().toISOString(),
+      }
+    }, { 
+      status: 200, 
+      headers: { 'Cache-Control': 'no-store' } 
+    });
+
+  } catch (err) {
+    const isProd = process.env.NODE_ENV === 'production';
+    const errorMessage = isProd ? 'Internal market data error' : (err.message || 'Unknown error');
+    
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
