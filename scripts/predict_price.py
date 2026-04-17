@@ -162,6 +162,7 @@ def run_inference(model, torch, closes):
 
 
 def main():
+    # changed the a bit of logic
     if len(sys.argv) < 2:
         fail("Usage: predict_price.py '[close1, close2, ...]'")
 
