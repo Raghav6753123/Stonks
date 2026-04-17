@@ -2,13 +2,16 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "// deployment": "Optimized for Vercel Edge functions and AI orchestration",
   "scripts": {
+    "// build_note": "Ensures legacy browser mappings don't stall the Vercel build pipeline",
     "build": "cross-env BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true BROWSERSLIST_IGNORE_OLD_DATA=true next build",
     "dev": "cross-env BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true BROWSERSLIST_IGNORE_OLD_DATA=true next dev",
     "lint": "eslint .",
     "start": "cross-env BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true BROWSERSLIST_IGNORE_OLD_DATA=true next start",
     "db:delete-users": "node scripts/delete-all-users.cjs",
-    "db:view-all": "node scripts/view-all-tables-data.cjs"
+    "db:view-all": "node scripts/view-all-tables-data.cjs",
+    "// vercel-postbuild": "Optional: Add commands here to run after Vercel finishes the build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -42,7 +45,9 @@
     "@radix-ui/react-toggle": "1.1.1",
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
+    "// vercel-observability": "Analytics and Real-time user monitoring",
     "@vercel/analytics": "1.3.1",
+    "@vercel/speed-insights": "^1.1.0",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^3.0.3",
     "chromadb": "^3.3.1",
