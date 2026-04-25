@@ -162,11 +162,11 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] text-foreground dark relative">
+    <div className="min-h-screen bg-[#0B1426] text-foreground dark relative">
       {/* Global Grid Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {/* Base dark background */}
-        <div className="absolute inset-0 bg-[#0a0a12]" />
+        <div className="absolute inset-0 bg-[#0B1426]" />
         
         {/* Large grid squares */}
         <div 
@@ -190,7 +190,7 @@ export default function Home() {
         <div 
           className="absolute inset-0 pointer-events-none" 
           style={{
-            background: 'linear-gradient(to bottom, transparent 0%, rgba(10, 10, 18, 0.5) 20%, rgba(10, 10, 18, 0.85) 30%, rgba(10, 10, 18, 1) 35%, rgba(10, 10, 18, 1) 100%)'
+            background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 20, 38, 0.5) 20%, rgba(11, 20, 38, 0.85) 30%, rgba(11, 20, 38, 1) 35%, rgba(11, 20, 38, 1) 100%)'
           }}
         />
       </div>
@@ -302,7 +302,7 @@ export default function Home() {
               <div className="absolute -inset-4 bg-gradient-to-r from-[#10b981]/20 via-[#6366f1]/10 to-[#10b981]/20 rounded-3xl blur-2xl opacity-60" />
               
               {/* Main Card */}
-              <div className="relative bg-[#12121a]/90 backdrop-blur-xl border border-[#2a2a3e] rounded-2xl p-6 shadow-2xl">
+              <div className="relative bg-[#0f1d32]/90 backdrop-blur-xl border border-[#1e293b] rounded-2xl p-6 shadow-2xl">
                 {/* Card Header */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -323,7 +323,7 @@ export default function Home() {
                 </div>
 
                 {/* Chart Area */}
-                <div className="relative h-48 mb-6 bg-[#0d1117] rounded-xl p-4 overflow-hidden">
+                <div className="relative h-48 mb-6 bg-[#0f0f17] rounded-xl p-4 overflow-hidden">
                   <svg className="w-full h-full" viewBox="0 0 400 150" preserveAspectRatio="none">
                     {/* Gradient Fill */}
                     <defs>
@@ -340,7 +340,7 @@ export default function Home() {
                     
                     {/* Grid lines */}
                     {[0, 37.5, 75, 112.5, 150].map((y, i) => (
-                      <line key={i} x1="0" y1={y} x2="400" y2={y} stroke="#1a1a2e" strokeWidth="1" />
+                      <line key={i} x1="0" y1={y} x2="400" y2={y} stroke="#132440" strokeWidth="1" />
                     ))}
                     
                     {/* Area Fill */}
@@ -368,7 +368,7 @@ export default function Home() {
                   </svg>
                   
                   {/* Tooltip */}
-                  <div className="absolute top-4 right-6 bg-[#1a1a2e] border border-[#2a2a3e] rounded-lg px-3 py-2 shadow-lg">
+                  <div className="absolute top-4 right-6 bg-[#132440] border border-[#1e293b] rounded-lg px-3 py-2 shadow-lg">
                     <div className="text-xs text-gray-400">Today&apos;s High</div>
                     <div className="font-semibold text-[#10b981] transition-all duration-300">${high.toFixed(2)}</div>
                   </div>
@@ -385,17 +385,17 @@ export default function Home() {
 
                 {/* Indicators Row */}
                 <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-3 text-center">
+                  <div className="bg-[#132440] border border-[#1e293b] rounded-xl p-3 text-center">
                     <div className="text-xs text-gray-400 mb-1">RSI</div>
                     <div className="font-semibold text-white transition-all duration-300">{rsi.toFixed(1)}</div>
                   </div>
-                  <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-3 text-center">
+                  <div className="bg-[#132440] border border-[#1e293b] rounded-xl p-3 text-center">
                     <div className="text-xs text-gray-400 mb-1">MACD</div>
                     <div className={`font-semibold transition-all duration-300 ${macd >= 0 ? 'text-[#10b981]' : 'text-red-400'}`}>
                       {macd >= 0 ? '+' : ''}{macd.toFixed(2)}
                     </div>
                   </div>
-                  <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-3 text-center">
+                  <div className="bg-[#132440] border border-[#1e293b] rounded-xl p-3 text-center">
                     <div className="text-xs text-gray-400 mb-1">Volume</div>
                     <div className="font-semibold text-white transition-all duration-300">{volume.toFixed(1)}M</div>
                   </div>
@@ -414,14 +414,14 @@ export default function Home() {
               </div>
 
               {/* Floating Elements */}
-              <div className="absolute -top-4 -right-4 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-3 shadow-lg animate-bounce" style={{ animationDuration: '3s' }}>
+              <div className="absolute -top-4 -right-4 bg-[#132440] border border-[#1e293b] rounded-xl p-3 shadow-lg animate-bounce" style={{ animationDuration: '3s' }}>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
                   <span className="text-sm font-medium text-white">Live</span>
                 </div>
               </div>
               
-              <div className="absolute -bottom-2 -left-2 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl px-4 py-2 shadow-lg">
+              <div className="absolute -bottom-2 -left-2 bg-[#132440] border border-[#1e293b] rounded-xl px-4 py-2 shadow-lg">
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-[#6366f1]" />
                   <span className="text-sm text-gray-400">50+ Indicators</span>
@@ -467,7 +467,7 @@ export default function Home() {
                 
                 {/* Main Dashboard Card */}
                 <div 
-                  className="relative bg-gradient-to-br from-[#12121a] to-[#0a0a12] rounded-2xl border border-[#1e1e2e] p-6 shadow-2xl"
+                  className="relative bg-gradient-to-br from-[#0f1d32] to-[#0a0a12] rounded-2xl border border-[#1e293b] p-6 shadow-2xl"
                   style={{ transform: 'rotateY(-5deg) rotateX(5deg)' }}
                 >
                   {/* Dashboard Header */}
@@ -481,7 +481,7 @@ export default function Home() {
                   </div>
                   
                   {/* Mini Chart */}
-                  <div className="bg-[#0d1117] rounded-xl p-4 mb-4">
+                  <div className="bg-[#0f0f17] rounded-xl p-4 mb-4">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-[#10b981]/20 flex items-center justify-center">
@@ -536,17 +536,17 @@ export default function Home() {
                   
                   {/* Quick Stats */}
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-[#1a1a2e] rounded-lg p-2 text-center">
+                    <div className="bg-[#132440] rounded-lg p-2 text-center">
                       <div className="text-xs text-gray-500">RSI</div>
                       <div className="text-sm font-semibold text-white transition-all duration-300">{dashRsi.toFixed(1)}</div>
                     </div>
-                    <div className="bg-[#1a1a2e] rounded-lg p-2 text-center">
+                    <div className="bg-[#132440] rounded-lg p-2 text-center">
                       <div className="text-xs text-gray-500">MACD</div>
                       <div className={`text-sm font-semibold transition-all duration-300 ${dashMacd >= 0 ? 'text-[#10b981]' : 'text-red-500'}`}>
                         {dashMacd >= 0 ? '+' : ''}{dashMacd.toFixed(2)}
                       </div>
                     </div>
-                    <div className="bg-[#1a1a2e] rounded-lg p-2 text-center">
+                    <div className="bg-[#132440] rounded-lg p-2 text-center">
                       <div className="text-xs text-gray-500">Vol</div>
                       <div className="text-sm font-semibold text-white transition-all duration-300">{dashVol}M</div>
                     </div>
@@ -554,21 +554,21 @@ export default function Home() {
                 </div>
                 
                 {/* Floating Stock Tickers */}
-                <div className="absolute -top-6 -right-6 bg-[#12121a] border border-[#2a2a3e] rounded-xl px-4 py-2 shadow-xl animate-bounce" style={{ animationDuration: '4s' }}>
+                <div className="absolute -top-6 -right-6 bg-[#0f1d32] border border-[#1e293b] rounded-xl px-4 py-2 shadow-xl animate-bounce" style={{ animationDuration: '4s' }}>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-white">AAPL</span>
                     <span className="text-xs text-[#10b981]">+1.2%</span>
                   </div>
                 </div>
                 
-                <div className="absolute -bottom-4 -left-6 bg-[#12121a] border border-[#2a2a3e] rounded-xl px-4 py-2 shadow-xl animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}>
+                <div className="absolute -bottom-4 -left-6 bg-[#0f1d32] border border-[#1e293b] rounded-xl px-4 py-2 shadow-xl animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-white">TSLA</span>
                     <span className="text-xs text-[#10b981]">+3.4%</span>
                   </div>
                 </div>
                 
-                <div className="absolute top-1/2 -right-10 bg-[#12121a] border border-[#2a2a3e] rounded-xl px-4 py-2 shadow-xl animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '0.5s' }}>
+                <div className="absolute top-1/2 -right-10 bg-[#0f1d32] border border-[#1e293b] rounded-xl px-4 py-2 shadow-xl animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '0.5s' }}>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-white">MSFT</span>
                     <span className="text-xs text-[#10b981]">+0.8%</span>
@@ -608,7 +608,7 @@ export default function Home() {
                   return (
                     <div
                       key={index}
-                      className="absolute w-[90%] max-w-[400px] p-6 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border cursor-pointer"
+                      className="absolute w-[90%] max-w-[400px] p-6 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border cursor-pointer"
                       style={{
                         zIndex: transform.z,
                         transform: `translateY(${transform.y}px) scale(${transform.scale}) rotate(${transform.rotate}deg)`,
@@ -616,7 +616,7 @@ export default function Home() {
                         boxShadow: position === 0 
                           ? `0 25px 50px -12px rgba(0,0,0,0.5), 0 0 60px ${feature.color}30`
                           : `0 15px 30px -10px rgba(0,0,0,0.4)`,
-                        borderColor: position === 0 ? `${feature.color}50` : '#1e1e2e',
+                        borderColor: position === 0 ? `${feature.color}50` : '#1e293b',
                         transition: 'all 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                     >
@@ -669,7 +669,7 @@ export default function Home() {
                     onClick={() => setActiveCardIndex(i)}
                     className="w-2 h-2 rounded-full transition-all duration-300"
                     style={{
-                      background: i === activeCardIndex ? '#10b981' : '#2a2a3e',
+                      background: i === activeCardIndex ? '#10b981' : '#1e293b',
                       transform: i === activeCardIndex ? 'scale(1.5)' : 'scale(1)',
                     }}
                   />
@@ -683,7 +683,7 @@ export default function Home() {
           </div>
 
           {/* Moving Stock Ticker Bar */}
-          <div className="mt-20 py-4 rounded-2xl bg-gradient-to-r from-[#12121a] via-[#1a1a2e] to-[#12121a] border border-[#1e1e2e] overflow-hidden">
+          <div className="mt-20 py-4 rounded-2xl bg-gradient-to-r from-[#0f1d32] via-[#132440] to-[#0f1d32] border border-[#1e293b] overflow-hidden">
             <div className="flex animate-marquee whitespace-nowrap">
               {[
                 { symbol: 'AAPL', price: 189.84, change: 2.34 },
@@ -715,7 +715,7 @@ export default function Home() {
                       {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
                     </span>
                   </div>
-                  <div className="w-px h-4 bg-[#2a2a3e]" />
+                  <div className="w-px h-4 bg-[#1e293b]" />
                 </div>
               ))}
             </div>
@@ -768,7 +768,7 @@ export default function Home() {
               <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-0">
                 {/* Card - Left Side */}
                 <div className="md:pr-16 pl-12 md:pl-0">
-                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border border-[#10b981]/30 hover:border-[#10b981]/60 transition-all duration-500 shadow-[0_0_30px_rgba(16,185,129,0.15)] hover:shadow-[0_0_50px_rgba(16,185,129,0.25)]">
+                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border border-[#10b981]/30 hover:border-[#10b981]/60 transition-all duration-500 shadow-[0_0_30px_rgba(16,185,129,0.15)] hover:shadow-[0_0_50px_rgba(16,185,129,0.25)]">
                     {/* Glow */}
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#10b981]/15 to-transparent" />
                     
@@ -801,7 +801,7 @@ export default function Home() {
                 <div className="hidden md:block" />
                 {/* Card - Right Side */}
                 <div className="md:pl-16 pl-12">
-                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border border-[#6366f1]/30 hover:border-[#6366f1]/60 transition-all duration-500 shadow-[0_0_30px_rgba(99,102,241,0.15)] hover:shadow-[0_0_50px_rgba(99,102,241,0.25)]">
+                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border border-[#6366f1]/30 hover:border-[#6366f1]/60 transition-all duration-500 shadow-[0_0_30px_rgba(99,102,241,0.15)] hover:shadow-[0_0_50px_rgba(99,102,241,0.25)]">
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#6366f1]/15 to-transparent" />
                     
                     <div className="relative z-10">
@@ -829,7 +829,7 @@ export default function Home() {
               <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-0">
                 {/* Card - Left Side */}
                 <div className="md:pr-16 pl-12 md:pl-0">
-                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border border-[#f59e0b]/30 hover:border-[#f59e0b]/60 transition-all duration-500 shadow-[0_0_30px_rgba(245,158,11,0.15)] hover:shadow-[0_0_50px_rgba(245,158,11,0.25)]">
+                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border border-[#f59e0b]/30 hover:border-[#f59e0b]/60 transition-all duration-500 shadow-[0_0_30px_rgba(245,158,11,0.15)] hover:shadow-[0_0_50px_rgba(245,158,11,0.25)]">
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#f59e0b]/15 to-transparent" />
                     
                     <div className="relative z-10">
@@ -861,7 +861,7 @@ export default function Home() {
                 <div className="hidden md:block" />
                 {/* Card - Right Side */}
                 <div className="md:pl-16 pl-12">
-                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border border-[#22c55e]/30 hover:border-[#22c55e]/60 transition-all duration-500 shadow-[0_0_30px_rgba(34,197,94,0.15)] hover:shadow-[0_0_50px_rgba(34,197,94,0.25)]">
+                  <div className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border border-[#22c55e]/30 hover:border-[#22c55e]/60 transition-all duration-500 shadow-[0_0_30px_rgba(34,197,94,0.15)] hover:shadow-[0_0_50px_rgba(34,197,94,0.25)]">
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#22c55e]/15 to-transparent" />
                     
                     <div className="relative z-10">
@@ -915,7 +915,7 @@ export default function Home() {
 
           {/* Billing Toggle */}
           <div className="flex justify-center mb-12">
-            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-[#12121a] border border-[#2a2a3a]">
+            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-[#0f1d32] border border-[#2a2a3a]">
               <button
                 onClick={() => setBillingPeriod('monthly')}
                 className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
@@ -951,7 +951,7 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="group relative p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border border-[#2a2a3a] hover:border-[#10b981]/30 transition-all duration-500"
+              className="group relative p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border border-[#2a2a3a] hover:border-[#10b981]/30 transition-all duration-500"
             >
               <div className="mb-6">
                 <h3 className="text-xl font-bold text-white mb-2">Free</h3>
@@ -977,7 +977,7 @@ export default function Home() {
               </ul>
               
               <Link href="/signup" className="block">
-                <Button className="w-full bg-[#1e1e2e] hover:bg-[#2a2a3a] text-white border border-[#2a2a3a] hover:border-[#10b981]/50 transition-all duration-300">
+                <Button className="w-full bg-[#1e293b] hover:bg-[#2a2a3a] text-white border border-[#2a2a3a] hover:border-[#10b981]/50 transition-all duration-300">
                   Get Started
                 </Button>
               </Link>
@@ -989,7 +989,7 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="group relative p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border-2 border-[#10b981]/50 shadow-[0_0_40px_rgba(16,185,129,0.15)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(16,185,129,0.25)]"
+              className="group relative p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border-2 border-[#10b981]/50 shadow-[0_0_40px_rgba(16,185,129,0.15)] transition-all duration-500 hover:shadow-[0_0_60px_rgba(16,185,129,0.25)]"
             >
               {/* Popular Badge */}
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -1064,7 +1064,7 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="group relative p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-[#12121a] to-[#0d0d14] border border-[#2a2a3a] hover:border-[#6366f1]/30 transition-all duration-500"
+              className="group relative p-6 lg:p-8 rounded-2xl bg-gradient-to-br from-[#0f1d32] to-[#0B1426] border border-[#2a2a3a] hover:border-[#6366f1]/30 transition-all duration-500"
             >
               <div className="mb-6">
                 <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
@@ -1097,7 +1097,7 @@ export default function Home() {
               </ul>
               
               <Link href="/signup" className="block">
-                <Button className="w-full bg-[#1e1e2e] hover:bg-[#2a2a3a] text-white border border-[#6366f1]/30 hover:border-[#6366f1]/60 transition-all duration-300">
+                <Button className="w-full bg-[#1e293b] hover:bg-[#2a2a3a] text-white border border-[#6366f1]/30 hover:border-[#6366f1]/60 transition-all duration-300">
                   Contact Sales
                 </Button>
               </Link>
@@ -1108,7 +1108,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="pt-16 pb-10 px-4 sm:px-6 lg:px-8 border-t border-[#1e1e2e]">
+      <footer className="pt-16 pb-10 px-4 sm:px-6 lg:px-8 border-t border-[#1e293b]">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
             {/* Brand */}
@@ -1163,7 +1163,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-12 pt-8 border-t border-[#1e1e2e] flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="mt-12 pt-8 border-t border-[#1e293b] flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-gray-500">© 2026 Stonks, Inc. All rights reserved.</p>
             <div className="flex items-center gap-4 text-xs text-gray-500">
               <span>FINRA #STK-4821</span>

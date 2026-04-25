@@ -116,7 +116,7 @@ export default function StocksPage() {
     <>
       {/* header */}
       <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="p-2 rounded-xl bg-[#1a1a2e] border border-[#2a2a3e] text-gray-400 hover:text-white transition-all">
+        <Link href="/dashboard" className="p-2 rounded-xl bg-muted border border-border text-gray-400 hover:text-white transition-all">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1">
@@ -129,7 +129,7 @@ export default function StocksPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* search */}
-          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#0c0c18] border border-[#1a1a2e] focus-within:border-[#10b981]/40 transition-all flex-1 max-w-md">
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-card border border-border focus-within:border-[#10b981]/40 transition-all flex-1 max-w-md">
             <Search className="w-4 h-4 text-gray-500 shrink-0" />
             <input
               value={search}
@@ -151,7 +151,7 @@ export default function StocksPage() {
             className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-medium transition-all
               ${showWishlistOnly
                 ? 'bg-[#ef4444]/10 border-[#ef4444]/25 text-[#ef4444]'
-                : 'bg-[#0c0c18] border-[#1a1a2e] text-gray-400 hover:text-white hover:border-[#2a2a3e]'
+                : 'bg-card border-border text-gray-400 hover:text-white hover:border-border'
               }`}
           >
             <Heart className={`w-3.5 h-3.5 ${showWishlistOnly ? 'fill-current' : ''}`} />
@@ -177,7 +177,7 @@ export default function StocksPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150
                 ${sector === s
                   ? 'bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/25 shadow-[0_0_8px_rgba(16,185,129,0.1)]'
-                  : 'bg-[#0c0c18] text-gray-500 hover:text-gray-300 border border-[#1a1a2e] hover:border-[#2a2a3e]'
+                  : 'bg-card text-gray-500 hover:text-gray-300 border border-border hover:border-border'
                 }`}
             >
               {s}
@@ -190,11 +190,11 @@ export default function StocksPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {Array.from({ length: 20 }).map((_, i) => (
-            <div key={i} className="h-22 rounded-2xl border border-[#1a1a2e] bg-[#0f0f1a] animate-pulse" />
+            <div key={i} className="h-22 rounded-2xl border border-border bg-card animate-pulse" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#2a2a3e] bg-[#0f0f1a]/50 p-14 text-center">
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-14 text-center">
           <Search className="w-8 h-8 text-gray-700 mx-auto mb-3" />
           <p className="text-sm text-gray-400">No stocks match your filters</p>
           <p className="text-xs text-gray-600 mt-1">Try adjusting your search or sector filter</p>
@@ -304,7 +304,7 @@ function StockCard({
           onOpen();
         }
       }}
-      className="group relative block rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] hover:border-[#2a2a3e] transition-all duration-200 hover:bg-[#0e0e1c] overflow-hidden cursor-pointer"
+      className="group relative block rounded-2xl border border-border bg-card hover:border-border transition-all duration-200 hover:bg-muted overflow-hidden cursor-pointer"
     >
       {/* header row */}
       <div className="flex items-center gap-2.5 p-3.5 pb-0">
@@ -377,7 +377,7 @@ function StockCard({
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="w-full h-full rounded-lg bg-[#1a1a2e]/40 animate-pulse" />
+          <div className="w-full h-full rounded-lg bg-muted/40 animate-pulse" />
         )}
       </div>
 

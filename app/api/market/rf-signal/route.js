@@ -129,6 +129,7 @@ export async function GET(req) {
           prediction,
           label: label === 'BUY' ? 'BUY' : 'SELL',
           confidence: clampConfidence(data?.confidence),
+          predicted_price_5d: Number(data?.predicted_price_5d) || null,
           timestamp: data?.timestamp || new Date().toISOString(),
           source: 'rf-service',
         };

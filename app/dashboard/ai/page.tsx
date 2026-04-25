@@ -177,7 +177,7 @@ export default function AiChatPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="p-2 rounded-xl bg-[#1a1a2e] border border-[#2a2a3e] text-gray-400 hover:text-white transition-all">
+        <Link href="/dashboard" className="p-2 rounded-xl bg-muted border border-border text-gray-400 hover:text-white transition-all">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
@@ -189,10 +189,10 @@ export default function AiChatPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] overflow-hidden">
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div ref={listRef} className="h-[60vh] overflow-y-auto p-4 space-y-3">
           {historyLoading && (
-            <div className="rounded-xl border border-[#1a1a2e] bg-[#0f0f1a] p-3 text-xs text-gray-400 flex items-center gap-2">
+            <div className="rounded-xl border border-border bg-card p-3 text-xs text-gray-400 flex items-center gap-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Loading previous chats...
             </div>
@@ -200,7 +200,7 @@ export default function AiChatPage() {
 
           {messages.length === 0 && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-[#1a1a2e] bg-[#0f0f1a] p-3 text-sm text-gray-300">
+              <div className="rounded-xl border border-border bg-card p-3 text-sm text-gray-300">
                 Ask anything about your market feed. I’ll use database context from Chroma before answering.
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -208,7 +208,7 @@ export default function AiChatPage() {
                   <button
                     key={s}
                     onClick={() => sendPrompt(s)}
-                    className="text-left rounded-xl border border-[#1a1a2e] bg-[#0f0f1a] px-3 py-2 text-xs text-gray-400 hover:text-white hover:border-[#2a2a3e] transition-all"
+                    className="text-left rounded-xl border border-border bg-card px-3 py-2 text-xs text-gray-400 hover:text-white hover:border-border transition-all"
                   >
                     {s}
                   </button>
@@ -224,8 +224,8 @@ export default function AiChatPage() {
                 <div
                   className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed border ${
                     user
-                      ? 'bg-[#10b981]/10 border-[#10b981]/25 text-[#d1fae5]'
-                      : 'bg-[#111122] border-[#2a2a3e] text-gray-200'
+                      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-700 dark:text-emerald-200'
+                      : 'bg-muted border-border text-foreground'
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{m.text}</p>
@@ -236,7 +236,7 @@ export default function AiChatPage() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="rounded-2xl px-3.5 py-2.5 text-sm border bg-[#111122] border-[#2a2a3e] text-gray-300 flex items-center gap-2">
+              <div className="rounded-2xl px-3.5 py-2.5 text-sm border bg-muted border-border text-muted-foreground flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Thinking with DB context...
               </div>
@@ -244,7 +244,7 @@ export default function AiChatPage() {
           )}
         </div>
 
-        <div className="border-t border-[#1a1a2e] p-3.5 space-y-2">
+        <div className="border-t border-border p-3.5 space-y-2">
           {limitReached && (
             <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
               <p className="text-xs text-amber-300">This chat reached its limit. Start a new chat to continue.</p>
@@ -268,12 +268,12 @@ export default function AiChatPage() {
                 }
               }}
               placeholder="Ask about stocks, sectors, or trends..."
-              className="min-h-11.5 max-h-40 resize-y flex-1 rounded-xl bg-[#090914] border border-[#1a1a2e] text-sm text-white placeholder-gray-600 px-3 py-2 outline-none focus:border-[#10b981]/40"
+              className="min-h-11.5 max-h-40 resize-y flex-1 rounded-xl bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground px-3 py-2 outline-none focus:border-primary/40"
             />
             <button
               onClick={() => sendPrompt()}
               disabled={!canSend}
-              className="h-11.5 px-3.5 rounded-xl bg-[#10b981] text-black font-semibold text-sm hover:bg-[#34d399] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+              className="h-11.5 px-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
             >
               <Send className="w-4 h-4" />
               Send

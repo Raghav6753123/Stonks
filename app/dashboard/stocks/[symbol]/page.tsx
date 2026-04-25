@@ -83,6 +83,15 @@ type PortfolioResponse = {
   transactions: Txn[];
 };
 
+type BuySignalResponse = {
+  ticker: string;
+  current_price: number;
+  predicted_price_5d: number;
+  predicted_return_percent: number;
+  signal: 'BUY' | 'DO NOT BUY';
+  disclaimer: string;
+};
+
 function seededRandom(seed: number) {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
@@ -234,6 +243,7 @@ export default function StockDetailsPage() {
   const [minuteData, setMinuteData] = useState<MinutePoint[]>([]);
   const [dailyData, setDailyData] = useState<DailyPoint[]>([]);
   const [modelPredictedPrice, setModelPredictedPrice] = useState<number | null>(null);
+  const [buySignalResult, setBuySignalResult] = useState<BuySignalResponse | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
   const [tradeSide, setTradeSide] = useState<'BUY' | 'SELL'>('BUY');
   const [tradeQty, setTradeQty] = useState('');
@@ -366,24 +376,18 @@ export default function StockDetailsPage() {
     let alive = true;
 
     const runPrediction = async () => {
-      if (dailyData.length < 50) {
-        setModelPredictedPrice(null);
-        return;
-      }
-
       try {
-        const closes = dailyData.slice(-50).map((d) => d.close);
-        const res = await fetch('/api/market/predict', {
+        const res = await fetch('/api/predict/eod', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ closes }),
+          body: JSON.stringify({ ticker: routeSymbol }),
           cache: 'no-store',
         });
         const json = await res.json();
 
         if (!alive) return;
-        if (res.ok && Number.isFinite(Number(json?.predicted))) {
-          setModelPredictedPrice(Number(json.predicted));
+        if (res.ok && Number.isFinite(Number(json?.predicted_close))) {
+          setModelPredictedPrice(Number(json.predicted_close));
         } else {
           setModelPredictedPrice(null);
         }
@@ -394,10 +398,37 @@ export default function StockDetailsPage() {
     };
 
     runPrediction();
+
+    const fetchBuySignal = async () => {
+      try {
+        const res = await fetch('/api/predict-buy-signal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker: routeSymbol }),
+          cache: 'no-store',
+        });
+        const json = await res.json();
+
+        if (!alive) return;
+        if (res.ok && json?.signal) {
+          setBuySignalResult(json);
+        } else {
+          setBuySignalResult(null);
+        }
+      } catch {
+        if (!alive) return;
+        setBuySignalResult(null);
+      }
+    };
+    
+    if (routeSymbol === 'AAPL' || routeSymbol === 'TSLA') {
+      fetchBuySignal();
+    }
+
     return () => {
       alive = false;
     };
-  }, [dailyData]);
+  }, [routeSymbol]);
 
   const predictedPrice = useMemo(() => {
     if (Number.isFinite(modelPredictedPrice)) return round2(Number(modelPredictedPrice));
@@ -517,46 +548,77 @@ export default function StockDetailsPage() {
   }, [stock, tradeQty, todayPrice, tradeSide, loadPortfolio]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
         <Link
           href="/dashboard/stocks"
-          className="p-2 rounded-xl bg-[#1a1a2e] border border-[#2a2a3e] text-gray-400 hover:text-white transition-all"
+          className="p-2.5 rounded-xl bg-muted border border-border text-gray-400 hover:text-white hover:border-gray-600 transition-all shadow-sm"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{routeSymbol || 'Stock Details'}</h1>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
-            {stock?.name || 'Live stock view'}
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black truncate">{routeSymbol || 'Stock Details'}</h1>
+            {stock?.live && (
+              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1 truncate">
+            {stock?.name || 'Live stock view'} · {stock?.sector || 'Equity'}
           </p>
         </div>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="xl:col-span-2 h-115 rounded-3xl border border-[#1a1a2e] bg-[#0f0f1a] animate-pulse" />
-          <div className="h-115 rounded-3xl border border-[#1a1a2e] bg-[#0f0f1a] animate-pulse" />
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-8 h-[500px] rounded-2xl border border-border bg-card animate-pulse" />
+          <div className="xl:col-span-4 h-[500px] rounded-2xl border border-border bg-card animate-pulse" />
         </div>
       ) : error || !stock ? (
-        <div className="rounded-2xl border border-dashed border-[#2a2a3e] bg-[#0f0f1a]/50 p-14 text-center">
-          <p className="text-sm text-gray-300">{error || 'Unable to load this stock'}</p>
-          <p className="text-xs text-gray-500 mt-1">Try another symbol from the stocks list.</p>
+        <div className="rounded-2xl border border-dashed border-border bg-card p-14 text-center">
+          <p className="text-sm font-medium text-gray-300">{error || 'Unable to load this stock'}</p>
+          <p className="text-xs text-gray-500 mt-2">Try another symbol from the stocks list.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <section className="xl:col-span-2 rounded-3xl border border-[#1a1a2e] bg-[#0c0c18] p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-sm sm:text-base text-gray-300 font-semibold">Daily Price Movement</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Y axis: rate, X axis: day</p>
-              </div>
-              <div className="px-2.5 py-1.5 rounded-lg bg-[#111827] border border-[#1f2937] text-xs text-gray-300">
-                {dailyData.length > 0 ? 'Yahoo historical (last 50 days)' : 'Demo fallback candles'} + 5-day moving average
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <section className="xl:col-span-8 space-y-6">
+
+            {/* Price Hero */}
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Current Price</p>
+                  <p className="text-4xl font-black text-white tabular-nums tracking-tight">{formatPrice(stock.sym, todayPrice)}</p>
+                  <div className={`mt-2 inline-flex items-center gap-1 text-sm font-bold px-2.5 py-1 rounded-lg ${todayChangePct >= 0 ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-red-400 bg-red-500/10 border border-red-500/20'}`}>
+                    {todayChangePct >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                    {Math.abs(todayChangePct).toFixed(2)}% today
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <Metric label="Open" value={formatPrice(stock.sym, intraday.open)} icon={<CalendarRange className="w-3.5 h-3.5" />} />
+                  <Metric label="High" value={formatPrice(stock.sym, intraday.high)} icon={<ArrowUpRight className="w-3.5 h-3.5" />} />
+                  <Metric label="Low" value={formatPrice(stock.sym, intraday.low)} icon={<ArrowDownRight className="w-3.5 h-3.5" />} />
+                  <Metric label="Volume" value={stock.vol} icon={<Activity className="w-3.5 h-3.5" />} />
+                </div>
               </div>
             </div>
 
-            <div className="h-90 w-full rounded-2xl bg-[#080811] border border-[#151527] p-2">
+            {/* Chart */}
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <div>
+                <h2 className="text-base font-bold text-white">Daily Price Movement</h2>
+                <p className="text-xs text-gray-500 mt-1">Candlestick chart with 5-day moving average overlay</p>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-muted text-gray-400 border border-border">
+                {dailyData.length > 0 ? 'Yahoo · 50 sessions' : 'Demo data'}
+              </span>
+            </div>
+
+            <div className="h-96 w-full rounded-xl bg-[#060610] border border-[#151527] p-3">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={dailyCandles} margin={{ top: 14, right: 16, bottom: 8, left: 2 }}>
                   <defs>
@@ -609,165 +671,217 @@ export default function StockDetailsPage() {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-          </section>
-
-          <aside className="rounded-3xl border border-[#1a1a2e] bg-[#0c0c18] p-4 sm:p-5 flex flex-col gap-3.5">
-            <div className="rounded-2xl border border-[#1f2937] bg-[#0b1220] p-4">
-              <p className="text-xs text-gray-400">Today's Price (real, Finnhub)</p>
-              <p className="text-2xl font-bold mt-1 tracking-tight">{formatPrice(stock.sym, todayPrice)}</p>
-              <div
-                className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
-                  todayChangePct >= 0
-                    ? 'text-[#22c55e] bg-[#22c55e]/10 border border-[#22c55e]/20'
-                    : 'text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20'
-                }`}
-              >
-                {todayChangePct >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {Math.abs(todayChangePct).toFixed(2)}% today
-              </div>
             </div>
 
-            <div className="rounded-2xl border border-[#1f2937] bg-[#111827] p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-gray-400">
-                  Predicted Price {modelPredictedPrice !== null ? '(model)' : '(demo fallback)'}
+            {/* AI Predictions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">EOD Price Predictor</p>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#38bdf8]/10 text-[#38bdf8] border border-[#38bdf8]/20">
+                    {modelPredictedPrice !== null ? 'LSTM' : 'Heuristic'}
+                  </span>
+                </div>
+                <p className="text-3xl font-black text-white tracking-tight">{formatPrice(stock.sym, predictedPrice)}</p>
+                <p className={`text-sm mt-2 font-semibold ${predictionUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {predictionUp ? '+' : '-'}{formatPrice(stock.sym, Math.abs(predictionDelta))} vs current
                 </p>
-                <BrainCircuit className="w-3.5 h-3.5 text-[#38bdf8]" />
-              </div>
-              <p className="text-2xl font-bold mt-1 tracking-tight">{formatPrice(stock.sym, predictedPrice)}</p>
-              <p className={`text-xs mt-2 ${predictionUp ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
-                {predictionUp ? '+' : '-'}{formatPrice(stock.sym, Math.abs(predictionDelta))} vs current
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Metric label="Open" value={formatPrice(stock.sym, intraday.open)} icon={<CalendarRange className="w-3.5 h-3.5" />} />
-              <Metric label="High" value={formatPrice(stock.sym, intraday.high)} icon={<ArrowUpRight className="w-3.5 h-3.5" />} />
-              <Metric label="Low" value={formatPrice(stock.sym, intraday.low)} icon={<ArrowDownRight className="w-3.5 h-3.5" />} />
-              <Metric label="Volume" value={stock.vol} icon={<Activity className="w-3.5 h-3.5" />} />
-            </div>
-
-            <div className="rounded-2xl border border-[#1f2937] bg-[#0b1220] p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-[#10b981]" />
-                  <p className="text-xs text-gray-300 font-semibold">Trade {stock.sym}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={loadPortfolio}
-                    className="text-[11px] text-gray-400 hover:text-white inline-flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    Refresh
-                  </button>
-                  <Link href="/dashboard/portfolio" className="text-[11px] text-[#10b981] hover:text-[#34d399]">Portfolio</Link>
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setTradeSide('BUY')}
-                  className={`h-8 rounded-lg text-xs font-semibold border transition-all ${
-                    tradeSide === 'BUY'
-                      ? 'bg-[#10b981]/20 border-[#10b981]/40 text-[#22c55e]'
-                      : 'bg-[#111528] border-[#2a2f45] text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Buy
-                </button>
-                <button
-                  onClick={() => setTradeSide('SELL')}
-                  className={`h-8 rounded-lg text-xs font-semibold border transition-all ${
-                    tradeSide === 'SELL'
-                      ? 'bg-[#ef4444]/20 border-[#ef4444]/40 text-[#ef4444]'
-                      : 'bg-[#111528] border-[#2a2f45] text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Sell
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0.0001"
-                  step="0.0001"
-                  value={tradeQty}
-                  onChange={(e) => setTradeQty(e.target.value)}
-                  placeholder="Quantity"
-                  className="flex-1 h-9 rounded-lg border border-[#2a2f45] bg-[#111528] px-2.5 text-sm outline-none focus:border-[#10b981]/50"
-                />
-                <button
-                  onClick={() => {
-                    if (tradeSide === 'BUY') {
-                      const max = (portfolio?.walletBalance || 0) / Math.max(todayPrice, 0.0001);
-                      setTradeQty(String(round2(max)));
-                    } else {
-                      setTradeQty(String(round2(currentHolding?.quantity || 0)));
-                    }
-                  }}
-                  className="h-9 px-2.5 rounded-lg border border-[#2a2f45] bg-[#111528] text-xs text-gray-300 hover:text-white"
-                >
-                  Max
-                </button>
-              </div>
-
-              <div className="rounded-xl border border-[#212944] bg-[#10172c] p-2.5 text-[11px] space-y-1.5">
-                <div className="flex justify-between text-gray-400">
-                  <span>Wallet</span>
-                  <span className="text-white inline-flex items-center gap-1"><Wallet className="w-3 h-3" />{moneyINR(portfolio?.walletBalance || 0)}</span>
+              {buySignalResult ? (
+                <div className="rounded-2xl border border-[#8b5cf6]/30 bg-[#8b5cf6]/5 p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">RF Buy Signal (5-Day)</p>
+                    <BrainCircuit className="w-4 h-4 text-[#8b5cf6]" />
+                  </div>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className={`text-3xl font-black tracking-tight ${buySignalResult.signal === 'BUY' ? 'text-emerald-400' : 'text-orange-400'}`}>
+                        {buySignalResult.signal}
+                      </p>
+                      <p className={`text-sm mt-1 font-semibold ${buySignalResult.predicted_return_percent >= 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                        {buySignalResult.predicted_return_percent >= 0 ? '+' : ''}{buySignalResult.predicted_return_percent.toFixed(2)}% expected
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">5-Day Target</p>
+                      <p className="text-2xl font-black text-white tracking-tight mt-1">{formatPrice(stock.sym, buySignalResult.predicted_price_5d)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Your Holding</span>
-                  <span className="text-white">{currentHolding ? currentHolding.quantity.toLocaleString('en-IN', { maximumFractionDigits: 4 }) : '0'}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Est. Trade Value</span>
-                  <span className="text-white">{tradeValue > 0 ? formatPrice(stock.sym, tradeValue) : '—'}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={submitTrade}
-                disabled={tradeSubmitting || !Number.isFinite(tradeQtyNum) || tradeQtyNum <= 0 || todayPrice <= 0}
-                className={`w-full h-9 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 ${
-                  tradeSide === 'BUY'
-                    ? 'bg-[#10b981] text-[#05150d] hover:bg-[#34d399]'
-                    : 'bg-[#ef4444] text-white hover:bg-[#f87171]'
-                }`}
-              >
-                {tradeSubmitting ? 'Executing...' : tradeSide === 'BUY' ? 'Execute Buy' : 'Execute Sell'}
-              </button>
-
-              {tradeError && <p className="text-[11px] text-[#ef4444]">{tradeError}</p>}
-              {!tradeError && tradeSuccess && <p className="text-[11px] text-[#10b981]">{tradeSuccess}</p>}
-            </div>
-
-            <div className="rounded-2xl border border-[#1f2937] bg-[#0b1220] p-4">
-              <p className="text-xs text-gray-400 mb-2">Recent Trades ({stock.sym})</p>
-              {recentTrades.length === 0 ? (
-                <p className="text-[11px] text-gray-500">No transactions for this symbol yet.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="rounded-2xl border border-border bg-card p-5 shadow-sm flex flex-col justify-center items-center text-center">
+                  <BrainCircuit className="w-8 h-8 text-gray-700 mb-2" />
+                  <p className="text-xs text-gray-500 font-medium">Buy signal available for AAPL & TSLA only</p>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Trades for this stock */}
+            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white">Your Trades · {stock.sym}</h3>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-gray-400">{recentTrades.length}</span>
+              </div>
+              {recentTrades.length === 0 ? (
+                <div className="p-6 text-center text-sm text-gray-500">No transactions for this stock yet.</div>
+              ) : (
+                <div className="divide-y divide-border/50">
                   {recentTrades.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between text-[11px] border-b border-[#1a1a2e] pb-1.5 last:border-0 last:pb-0">
-                      <div>
-                        <p className={t.side === 'BUY' ? 'text-[#22c55e] font-semibold' : 'text-[#ef4444] font-semibold'}>{t.side}</p>
-                        <p className="text-gray-500">{fmtDate(t.createdAt)}</p>
+                    <div key={t.id} className="flex items-center justify-between px-5 py-3 hover:bg-muted/10 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${t.side === 'BUY' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                          {t.side}
+                        </span>
+                        <span className="text-xs text-gray-500">{fmtDate(t.createdAt)}</span>
                       </div>
                       <div className="text-right">
-                        <p className="text-gray-200">{t.quantity.toLocaleString('en-IN', { maximumFractionDigits: 4 })} @ {formatPrice(stock.sym, t.price)}</p>
-                        <p className="text-gray-400">{formatPrice(stock.sym, t.totalValue)}</p>
+                        <p className="text-sm font-bold text-white">{t.quantity.toLocaleString('en-IN', { maximumFractionDigits: 4 })} @ {formatPrice(stock.sym, t.price)}</p>
+                        <p className="text-xs text-gray-400">{formatPrice(stock.sym, t.totalValue)}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+          </section>
 
-            <div className="mt-auto text-[11px] text-gray-500 leading-relaxed border-t border-[#1a1a2e] pt-3">
-              Daily candles come from Yahoo history (3 months, last 50 sessions). Today's price uses live per-minute market API values.
+          {/* RIGHT COLUMN */}
+          <aside className="xl:col-span-4 space-y-6">
+
+            {/* Trade Ticket */}
+            <div className="rounded-2xl border border-primary/20 bg-linear-to-b from-card to-background p-5 shadow-lg relative overflow-hidden">
+              <div className="absolute -top-4 -right-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="flex items-center justify-between mb-5 relative z-10">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-primary" />
+                  Trade {stock.sym}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={loadPortfolio} className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                  <Link href="/dashboard/portfolio" className="text-xs font-bold text-primary hover:underline">Portfolio</Link>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-5 relative z-10">
+                <button
+                  onClick={() => setTradeSide('BUY')}
+                  className={`h-11 rounded-xl text-sm font-bold border-2 transition-all ${
+                    tradeSide === 'BUY'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                      : 'bg-card border-border text-gray-400 hover:border-gray-500'
+                  }`}
+                >
+                  Buy Order
+                </button>
+                <button
+                  onClick={() => setTradeSide('SELL')}
+                  className={`h-11 rounded-xl text-sm font-bold border-2 transition-all ${
+                    tradeSide === 'SELL'
+                      ? 'bg-red-500/10 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                      : 'bg-card border-border text-gray-400 hover:border-gray-500'
+                  }`}
+                >
+                  Sell Order
+                </button>
+              </div>
+
+              <div className="space-y-4 relative z-10">
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Quantity</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      value={tradeQty}
+                      onChange={(e) => setTradeQty(e.target.value)}
+                      placeholder="0.00"
+                      className="flex-1 h-11 rounded-xl border border-border bg-background px-3 text-sm font-medium text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                    />
+                    <button
+                      onClick={() => {
+                        if (tradeSide === 'BUY') {
+                          const max = (portfolio?.walletBalance || 0) / Math.max(todayPrice, 0.0001);
+                          setTradeQty(String(round2(max)));
+                        } else {
+                          setTradeQty(String(round2(currentHolding?.quantity || 0)));
+                        }
+                      }}
+                      className="h-11 px-4 rounded-xl border border-border bg-muted/50 text-xs font-bold text-gray-300 hover:text-white hover:bg-muted transition-all"
+                    >
+                      Max
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-medium">Wallet Balance</span>
+                    <span className="text-sm font-bold text-white inline-flex items-center gap-1"><Wallet className="w-3.5 h-3.5 text-primary" />{moneyINR(portfolio?.walletBalance || 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-medium">Your Holding</span>
+                    <span className="text-sm font-bold text-white">{currentHolding ? currentHolding.quantity.toLocaleString('en-IN', { maximumFractionDigits: 4 }) : '0'} units</span>
+                  </div>
+                  <div className="w-full h-px bg-border my-1" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-medium">Live Price</span>
+                    <span className="text-sm font-bold text-white">{formatPrice(stock.sym, todayPrice)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-medium">Estimated Value</span>
+                    <span className="text-sm font-bold text-primary">{tradeValue > 0 ? formatPrice(stock.sym, tradeValue) : '—'}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={submitTrade}
+                  disabled={tradeSubmitting || !Number.isFinite(tradeQtyNum) || tradeQtyNum <= 0 || todayPrice <= 0}
+                  className={`w-full h-12 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
+                    tradeSide === 'BUY'
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      : 'bg-red-500 text-white hover:bg-red-600'
+                  }`}
+                >
+                  {tradeSubmitting ? 'Processing...' : `Confirm ${tradeSide} Order`}
+                </button>
+
+                {tradeError && <p className="text-xs text-red-400 bg-red-500/10 p-2 rounded-lg">{tradeError}</p>}
+                {!tradeError && tradeSuccess && <p className="text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded-lg font-medium">{tradeSuccess}</p>}
+              </div>
+            </div>
+
+            {/* Stock Info */}
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-white mb-3">About {stock.sym}</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400 font-medium">Sector</span>
+                  <span className="text-sm font-semibold text-white">{stock.sector || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400 font-medium">Symbol</span>
+                  <span className="text-sm font-semibold text-white">{stock.sym}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400 font-medium">Market Status</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {stock.live ? 'Live' : 'Delayed'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400 font-medium">Data Source</span>
+                  <span className="text-xs text-gray-300">Finnhub + Yahoo</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-gray-500 leading-relaxed border border-border rounded-xl p-3 bg-muted/20">
+              Daily candles from Yahoo (3mo, last 50 sessions). Live price via Finnhub per-minute market feed.
             </div>
           </aside>
         </div>
@@ -778,12 +892,12 @@ export default function StockDetailsPage() {
 
 function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
-    <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] p-3">
-      <div className="flex items-center gap-1.5 text-gray-400 text-[11px]">
-        <span className="text-[#38bdf8]">{icon}</span>
+    <div className="rounded-xl border border-border bg-muted/30 p-3 shadow-sm">
+      <div className="flex items-center gap-1.5 text-gray-400 text-[11px] font-semibold uppercase tracking-wider">
+        <span className="text-primary">{icon}</span>
         <span>{label}</span>
       </div>
-      <p className="text-sm font-semibold mt-1.5 text-gray-100 truncate">{value}</p>
+      <p className="text-sm font-bold mt-2 text-white truncate tabular-nums">{value}</p>
     </div>
   );
 }

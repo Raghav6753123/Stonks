@@ -13,6 +13,7 @@ import {
   TrendingUp,
   RefreshCw,
   Star,
+  Brain,
 } from 'lucide-react';
 
 type MarketStock = {
@@ -68,6 +69,7 @@ type PortfolioRating = {
 type HoldingSignal = {
   label: 'BUY' | 'SELL';
   confidence: number | null;
+  predicted_price_5d?: number | null;
 };
 
 function money(v: number) {
@@ -309,6 +311,27 @@ export default function PortfolioPage() {
       const results = await Promise.all(
         enrichedHoldings.map(async (h) => {
           try {
+            // First try the new direct Buy Signal predictor (supports AAPL, TSLA)
+            const buySignalRes = await fetch('/api/predict-buy-signal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ticker: h.sym }),
+              cache: 'no-store'
+            });
+
+            if (buySignalRes.ok) {
+              const buyData = await buySignalRes.json();
+              return {
+                sym: h.sym,
+                signal: {
+                  label: buyData.signal, // "BUY" or "DO NOT BUY"
+                  confidence: null,      // No confidence score from the Random Forest model
+                  predicted_price_5d: buyData.predicted_price_5d
+                } as HoldingSignal,
+              };
+            }
+
+            // Fallback to legacy heuristic route for unsupported stocks
             const res = await fetch(`/api/market/rf-signal?ticker=${encodeURIComponent(h.sym)}`, { cache: 'no-store' });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) return null;
@@ -319,6 +342,7 @@ export default function PortfolioPage() {
               signal: {
                 label,
                 confidence: Number.isFinite(confidence) ? confidence : null,
+                predicted_price_5d: Number.isFinite(Number(data?.predicted_price_5d)) ? Number(data?.predicted_price_5d) : null,
               } as HoldingSignal,
             };
           } catch {
@@ -353,52 +377,50 @@ export default function PortfolioPage() {
       alive = false;
     };
   }, [enrichedHoldings]);
-
   return (
-    <>
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="p-2 rounded-xl bg-[#1a1a2e] border border-[#2a2a3e] text-gray-400 hover:text-white transition-all">
+        <Link href="/dashboard" className="p-2 rounded-xl bg-muted border border-border text-gray-400 hover:text-white transition-all">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Portfolio Command Center</h1>
           <p className="text-xs text-gray-500 mt-0.5">Buy, sell, monitor and rebalance your positions live.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={ratePortfolio}
-            disabled={ratingLoading}
-            className="h-9 rounded-xl border border-[#2a2a3e] bg-[#121526] px-3 text-xs text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-1.5"
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/portfolio-rater"
+            className="h-10 rounded-xl bg-primary text-primary-foreground px-4 text-sm font-semibold hover:bg-primary/90 inline-flex items-center gap-2 transition-all shadow-sm"
           >
-            <Star className={`w-3.5 h-3.5 text-[#f59e0b] ${ratingLoading ? 'animate-pulse' : ''}`} />
-            {ratingLoading ? 'Rating...' : 'Portfolio Rater'}
-          </button>
+            <Brain className="w-4 h-4" />
+            ML Rater
+          </Link>
           <button
             onClick={loadData}
             disabled={loading}
-            className="h-9 rounded-xl border border-[#2a2a3e] bg-[#121526] px-3 text-xs text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-2 transition-all shadow-sm"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
       </div>
 
-      {error && <p className="text-sm text-[#ef4444]">{error}</p>}
-      {success && <p className="text-sm text-[#10b981]">{success}</p>}
+      {error && <p className="text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30 p-3 rounded-xl">{error}</p>}
+      {success && <p className="text-sm text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 p-3 rounded-xl">{success}</p>}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        <MetricCard icon={<Wallet className="w-4 h-4 text-[#22c55e]" />} title="Wallet Cash" value={money(summary.walletBalance)} sub="Available to trade" />
-        <MetricCard icon={<PieChart className="w-4 h-4 text-[#38bdf8]" />} title="Portfolio Value" value={money(summary.totalMarketValue)} sub={`${summary.positions} open positions`} />
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <MetricCard icon={<Wallet className="w-5 h-5 text-[#22c55e]" />} title="Wallet Cash" value={money(summary.walletBalance)} sub="Available to trade" />
+        <MetricCard icon={<PieChart className="w-5 h-5 text-[#38bdf8]" />} title="Portfolio Value" value={money(summary.totalMarketValue)} sub={`${summary.positions} open positions`} />
         <MetricCard
-          icon={<Activity className="w-4 h-4 text-[#f59e0b]" />}
+          icon={<Activity className="w-5 h-5 text-[#f59e0b]" />}
           title="Unrealized P&L"
           value={money(summary.totalUnrealized)}
           sub={`${summary.totalUnrealizedPct >= 0 ? '+' : ''}${summary.totalUnrealizedPct.toFixed(2)}% vs cost`}
           positive={summary.totalUnrealized >= 0}
         />
         <MetricCard
-          icon={<Receipt className="w-4 h-4 text-[#a78bfa]" />}
+          icon={<Receipt className="w-5 h-5 text-[#a78bfa]" />}
           title="Realized P&L"
           value={money(summary.realizedPnl)}
           sub="From closed units"
@@ -406,314 +428,356 @@ export default function PortfolioPage() {
         />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <div className="xl:col-span-4 rounded-2xl border border-[#1f2538] bg-linear-to-br from-[#0e1222] to-[#0b0f1b] p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold tracking-wide text-white">Trade Ticket</h2>
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Market Order</span>
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        {/* LEFT COLUMN */}
+        <div className="xl:col-span-8 space-y-6">
+          
+          {/* Open Holdings */}
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-muted/20">
+              <h2 className="text-base font-bold text-white">Open Holdings</h2>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-gray-400">{enrichedHoldings.length} positions</span>
+            </div>
+
+            {signalNotice && (
+              <div className="px-5 py-3 border-b border-border bg-primary/5 text-sm font-medium text-primary flex items-center gap-2">
+                <Brain className="w-4 h-4" />
+                {signalNotice}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="p-8 text-center text-sm text-gray-400">Loading holdings...</div>
+            ) : enrichedHoldings.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400">No holdings yet. Start by buying your first stock.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead className="text-xs text-gray-400 uppercase tracking-wider bg-muted/10">
+                    <tr>
+                      <th className="text-left px-5 py-4 font-semibold">Symbol</th>
+                      <th className="text-right px-5 py-4 font-semibold">Qty</th>
+                      <th className="text-right px-5 py-4 font-semibold">Avg Cost</th>
+                      <th className="text-right px-5 py-4 font-semibold">LTP</th>
+                      <th className="text-right px-5 py-4 font-semibold">Market Value</th>
+                      <th className="text-right px-5 py-4 font-semibold">Unrealized</th>
+                      <th className="text-center px-5 py-4 font-semibold">AI Suggestion</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {enrichedHoldings.map((h) => {
+                      const up = h.unrealizedPnl >= 0;
+                      const signal = holdingSignals[h.sym];
+                      return (
+                        <tr key={h.sym} className="hover:bg-muted/10 transition-colors">
+                          <td className="px-5 py-4">
+                            <div className="font-bold text-white text-base">{h.sym}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{h.name}</div>
+                          </td>
+                          <td className="px-5 py-4 text-right font-medium text-gray-200">{qty(h.quantity)}</td>
+                          <td className="px-5 py-4 text-right text-gray-300">{money(h.avgPrice)}</td>
+                          <td className="px-5 py-4 text-right font-medium text-white">{h.currentPrice != null ? money(h.currentPrice) : '—'}</td>
+                          <td className="px-5 py-4 text-right font-medium text-white">{h.marketValue != null ? money(h.marketValue) : '—'}</td>
+                          <td className="px-5 py-4 text-right">
+                            {h.unrealizedPnl != null ? (
+                              <div className={`inline-flex flex-col items-end ${up ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                                <span className="font-bold">{up ? '+' : ''}{money(h.unrealizedPnl)}</span>
+                                <span className="text-xs opacity-80 font-medium">({(h.pnlPct ?? 0) >= 0 ? '+' : ''}{(h.pnlPct ?? 0).toFixed(2)}%)</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-500 font-normal">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            {signal ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold tracking-wide ${
+                                    signal.label === 'BUY'
+                                      ? 'bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20'
+                                      : 'bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20'
+                                  }`}
+                                >
+                                  {signal.label}
+                                </span>
+                                {signal.predicted_price_5d && (
+                                  <span className="text-[10px] text-gray-400 font-medium">Tgt: {money(signal.predicted_price_5d)}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-500">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <button
-              onClick={() => setSide('BUY')}
-              className={`h-9 rounded-lg text-sm font-semibold border transition-all ${
-                side === 'BUY'
-                  ? 'bg-[#10b981]/20 border-[#10b981]/40 text-[#22c55e]'
-                  : 'bg-[#111528] border-[#2a2f45] text-gray-400 hover:text-white'
-              }`}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => setSide('SELL')}
-              className={`h-9 rounded-lg text-sm font-semibold border transition-all ${
-                side === 'SELL'
-                  ? 'bg-[#ef4444]/20 border-[#ef4444]/40 text-[#ef4444]'
-                  : 'bg-[#111528] border-[#2a2f45] text-gray-400 hover:text-white'
-              }`}
-            >
-              Sell
-            </button>
-          </div>
-
-          <label className="text-xs text-gray-400 mb-1 block">Stock</label>
-          <select
-            value={selectedSym}
-            onChange={(e) => setSelectedSym(e.target.value)}
-            className="w-full h-10 rounded-lg border border-[#2a2f45] bg-[#111528] px-2.5 text-sm outline-none focus:border-[#10b981]/50"
-          >
-            {marketUniverse.map((s) => (
-              <option key={s.sym} value={s.sym}>
-                {s.sym} · {s.name}
-              </option>
-            ))}
-          </select>
-          {marketUniverse.length === 0 && (
-            <p className="text-[11px] text-[#ef4444] mt-1.5">No stocks received from market API.</p>
-          )}
-
-          <label className="text-xs text-gray-400 mt-3 mb-1 block">Quantity</label>
-          <input
-            type="number"
-            min="0.0001"
-            step="0.0001"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="0.00"
-            className="w-full h-10 rounded-lg border border-[#2a2f45] bg-[#111528] px-2.5 text-sm outline-none focus:border-[#10b981]/50"
-          />
-
-          <div className="mt-3 rounded-xl border border-[#212944] bg-[#10172c] p-3 text-xs space-y-1.5">
-            <div className="flex justify-between text-gray-400">
-              <span>Live Price</span>
-              <span className="text-white">{tradePreview.price > 0 ? money(tradePreview.price) : 'Live price unavailable'}</span>
+          {/* Recent Transactions */}
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-muted/20">
+              <h2 className="text-base font-bold text-white">Recent Transactions</h2>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-gray-400">Last 100</span>
             </div>
-            <div className="flex justify-between text-gray-400">
-              <span>Est. Trade Value</span>
-              <span className="text-white">{tradePreview.total > 0 ? money(tradePreview.total) : '—'}</span>
-            </div>
-            <div className="flex justify-between text-gray-400">
-              <span>Wallet After Trade</span>
-              <span className="text-white">
-                {money(
-                  side === 'BUY'
-                    ? summary.walletBalance - tradePreview.total
-                    : summary.walletBalance + tradePreview.total
-                )}
-              </span>
-            </div>
-          </div>
 
-          <button
-            onClick={submitTrade}
-            disabled={submitting || loading || !selectedStock || !selectedLiveQuote || tradePreview.price <= 0}
-            className={`w-full mt-3 h-10 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
-              side === 'BUY'
-                ? 'bg-[#10b981] text-[#05150d] hover:bg-[#34d399]'
-                : 'bg-[#ef4444] text-white hover:bg-[#f87171]'
-            }`}
-          >
-            {submitting ? 'Executing...' : side === 'BUY' ? 'Execute Buy' : 'Execute Sell'}
-          </button>
-        </div>
-
-        <div className="xl:col-span-8 rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#1a1a2e] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">Open Holdings</h2>
-            <span className="text-xs text-gray-500">{enrichedHoldings.length} positions</span>
-          </div>
-
-          {signalNotice && (
-            <div className="px-4 py-2 border-b border-[#1a1a2e] bg-[#111528] text-xs text-[#38bdf8]">
-              {signalNotice}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="p-6 text-sm text-gray-400">Loading holdings...</div>
-          ) : enrichedHoldings.length === 0 ? (
-            <div className="p-6 text-sm text-gray-400">No holdings yet. Start by buying your first stock.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-210 text-sm">
-                <thead className="text-xs text-gray-500">
-                  <tr>
-                    <th className="text-left px-4 py-3">Symbol</th>
-                    <th className="text-right px-4 py-3">Qty</th>
-                    <th className="text-right px-4 py-3">Avg Cost</th>
-                    <th className="text-right px-4 py-3">LTP</th>
-                    <th className="text-right px-4 py-3">Market Value</th>
-                    <th className="text-right px-4 py-3">Unrealized</th>
-                    <th className="text-center px-4 py-3">AI Suggestion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {enrichedHoldings.map((h) => {
-                    const up = h.unrealizedPnl >= 0;
-                    const signal = holdingSignals[h.sym];
-                    return (
-                      <tr key={h.sym} className="border-t border-[#1a1a2e]">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-white">{h.sym}</div>
-                          <div className="text-xs text-gray-500">{h.name}</div>
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-200">{qty(h.quantity)}</td>
-                        <td className="px-4 py-3 text-right text-gray-200">{money(h.avgPrice)}</td>
-                        <td className="px-4 py-3 text-right text-gray-200">{h.currentPrice != null ? money(h.currentPrice) : '—'}</td>
-                        <td className="px-4 py-3 text-right text-gray-200">{h.marketValue != null ? money(h.marketValue) : '—'}</td>
-                        <td className={`px-4 py-3 text-right font-semibold ${up ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-                          {h.unrealizedPnl != null ? (
-                            <>
-                              {up ? '+' : ''}{money(h.unrealizedPnl)}
-                              <span className="ml-1 text-xs opacity-80">({(h.pnlPct ?? 0) >= 0 ? '+' : ''}{(h.pnlPct ?? 0).toFixed(2)}%)</span>
-                            </>
-                          ) : (
-                            <span className="text-gray-500 font-normal">Live price unavailable</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {signal ? (
+            {!portfolio || portfolio.transactions.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400">No transactions yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] text-sm">
+                  <thead className="text-xs text-gray-400 uppercase tracking-wider bg-muted/10">
+                    <tr>
+                      <th className="text-left px-5 py-4 font-semibold">Time</th>
+                      <th className="text-left px-5 py-4 font-semibold">Stock</th>
+                      <th className="text-center px-5 py-4 font-semibold">Side</th>
+                      <th className="text-right px-5 py-4 font-semibold">Qty</th>
+                      <th className="text-right px-5 py-4 font-semibold">Price</th>
+                      <th className="text-right px-5 py-4 font-semibold">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {portfolio.transactions.slice(0, 5).map((t) => {
+                      return (
+                        <tr key={t.id} className="hover:bg-muted/10 transition-colors">
+                          <td className="px-5 py-4 text-xs text-gray-400 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                          <td className="px-5 py-4 font-bold text-white">{t.sym}</td>
+                          <td className="px-5 py-4 text-center">
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                signal.label === 'BUY'
-                                  ? 'bg-[#10b981]/20 text-[#22c55e]'
-                                  : 'bg-[#ef4444]/20 text-[#ef4444]'
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${
+                                t.side === 'BUY'
+                                  ? 'bg-[#10b981]/10 text-[#10b981]'
+                                  : 'bg-[#ef4444]/10 text-[#ef4444]'
                               }`}
-                              title={signal.confidence != null ? `Confidence ${(signal.confidence * 100).toFixed(1)}%` : 'Confidence unavailable'}
                             >
-                              {signal.label}
-                              {signal.confidence != null ? ` ${(signal.confidence * 100).toFixed(0)}%` : ''}
+                              {t.side === 'BUY' ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                              {t.side}
                             </span>
-                          ) : (
-                            <span className="text-xs text-gray-500">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          </td>
+                          <td className="px-5 py-4 text-right font-medium text-gray-200">{qty(t.quantity)}</td>
+                          <td className="px-5 py-4 text-right text-gray-300">{money(t.price)}</td>
+                          <td className="px-5 py-4 text-right font-medium text-white">{money(t.totalValue)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {portfolio && portfolio.transactions.length > 5 && (
+              <div className="px-5 py-3 border-t border-border bg-muted/5 flex items-center justify-between">
+                <span className="text-xs text-gray-400">Showing 5 of {portfolio.transactions.length}</span>
+                <Link
+                  href="/dashboard/transactions"
+                  className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                >
+                  View All Transactions →
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
-      </section>
 
-      <section className="rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Star className="w-4 h-4 text-[#f59e0b]" />
-          <h3 className="text-sm font-semibold">Portfolio Rater</h3>
-        </div>
-
-        {ratingError && <p className="text-xs text-[#ef4444] mb-2">{ratingError}</p>}
-
-        {!rating ? (
-          <p className="text-sm text-gray-500">Click "Portfolio Rater" near Refresh to get AI score and buy/sell suggestions.</p>
-        ) : (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-[#2a2f45] bg-[#111528] p-3">
-              <p className="text-[11px] text-gray-500 uppercase tracking-wider">Score</p>
-              <p className="text-2xl font-bold text-[#f59e0b] mt-1">{rating.score.toFixed(1)}/10</p>
-              <p className="text-xs text-gray-400 mt-1">{rating.summary}</p>
+        {/* RIGHT COLUMN */}
+        <div className="xl:col-span-4 space-y-6">
+          
+          {/* Trade Ticket */}
+          <div className="rounded-2xl border border-primary/20 bg-linear-to-b from-card to-background p-5 shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <TrendingUp className="w-24 h-24" />
+            </div>
+            
+            <div className="flex items-center justify-between mb-5 relative z-10">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Trade Ticket
+              </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {Array.isArray(rating.suggestions) && rating.suggestions.length > 0 ? (
-                rating.suggestions.slice(0, 6).map((s, idx) => (
-                  <div key={`${s.symbol}-${idx}`} className="rounded-lg border border-[#2a2f45] bg-[#111528] p-2.5">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-xs text-gray-300 font-semibold">{s.symbol || 'PORTFOLIO'}</span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                          s.action === 'BUY'
-                            ? 'bg-[#10b981]/20 text-[#22c55e]'
-                            : s.action === 'SELL'
-                              ? 'bg-[#ef4444]/20 text-[#ef4444]'
-                              : 'bg-[#334155]/40 text-[#cbd5e1]'
-                        }`}
-                      >
-                        {s.action}
-                      </span>
+            <div className="grid grid-cols-2 gap-3 mb-5 relative z-10">
+              <button
+                onClick={() => setSide('BUY')}
+                className={`h-11 rounded-xl text-sm font-bold border-2 transition-all ${
+                  side === 'BUY'
+                    ? 'bg-[#10b981]/10 border-[#10b981] text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                    : 'bg-card border-border text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                Buy Order
+              </button>
+              <button
+                onClick={() => setSide('SELL')}
+                className={`h-11 rounded-xl text-sm font-bold border-2 transition-all ${
+                  side === 'SELL'
+                    ? 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444] shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                    : 'bg-card border-border text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                Sell Order
+              </button>
+            </div>
+
+            <div className="space-y-4 relative z-10">
+              <div>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Select Asset</label>
+                <select
+                  value={selectedSym}
+                  onChange={(e) => setSelectedSym(e.target.value)}
+                  className="w-full h-11 rounded-xl border border-border bg-background px-3 text-sm font-medium text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                >
+                  {marketUniverse.map((s) => (
+                    <option key={s.sym} value={s.sym}>
+                      {s.sym} · {s.name}
+                    </option>
+                  ))}
+                </select>
+                {marketUniverse.length === 0 && (
+                  <p className="text-[11px] text-[#ef4444] mt-1.5 font-medium">No stocks available to trade.</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Quantity</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0.0001"
+                    step="0.0001"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full h-11 rounded-xl border border-border bg-background px-3 text-sm font-medium text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-medium">Units</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-400 font-medium">Live Market Price</span>
+                  <span className="text-sm font-bold text-white">{tradePreview.price > 0 ? money(tradePreview.price) : 'Unavailable'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-400 font-medium">Estimated Order Value</span>
+                  <span className="text-sm font-bold text-primary">{tradePreview.total > 0 ? money(tradePreview.total) : '—'}</span>
+                </div>
+                <div className="w-full h-px bg-border my-1" />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-400 font-medium">Projected Wallet Balance</span>
+                  <span className="text-sm font-bold text-white">
+                    {money(
+                      side === 'BUY'
+                        ? summary.walletBalance - tradePreview.total
+                        : summary.walletBalance + tradePreview.total
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={submitTrade}
+                disabled={submitting || loading || !selectedStock || !selectedLiveQuote || tradePreview.price <= 0}
+                className={`w-full h-12 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
+                  side === 'BUY'
+                    ? 'bg-[#10b981] text-white hover:bg-[#059669]'
+                    : 'bg-[#ef4444] text-white hover:bg-[#dc2626]'
+                }`}
+              >
+                {submitting ? 'Processing...' : `Confirm ${side} Order`}
+              </button>
+            </div>
+          </div>
+
+          {/* Top Allocation */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <PieChart className="w-5 h-5 text-primary" />
+              <h3 className="text-base font-bold text-white">Portfolio Allocation</h3>
+            </div>
+
+            {allocation.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4 text-center">Your portfolio is currently empty.</p>
+            ) : (
+              <div className="space-y-4">
+                {allocation.map((a) => (
+                  <div key={a.sym}>
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <span className="font-semibold text-gray-200">{a.sym}</span>
+                      <span className="font-bold text-white">{a.pct.toFixed(1)}%</span>
                     </div>
-                    <p className="text-[11px] text-gray-400">{s.reason}</p>
+                    <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${Math.max(2, Math.min(100, a.pct))}%` }}
+                      />
+                    </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-gray-500">No suggestions returned.</p>
-              )}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Gemini AI Rater (Legacy) */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-[#f59e0b]" />
+                <h3 className="text-base font-bold text-white">Gemini AI Analysis</h3>
+              </div>
+              <button
+                onClick={ratePortfolio}
+                disabled={ratingLoading}
+                className="h-8 rounded-lg bg-muted text-xs font-semibold px-3 hover:bg-muted/80 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {ratingLoading ? 'Analyzing...' : 'Run Analysis'}
+              </button>
             </div>
-          </div>
-        )}
-      </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <div className="xl:col-span-8 rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#1a1a2e] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">Recent Transactions</h2>
-            <span className="text-xs text-gray-500">Last 100 trades</span>
-          </div>
+            {ratingError && <p className="text-xs text-[#ef4444] bg-[#ef4444]/10 p-2 rounded-lg mb-3">{ratingError}</p>}
 
-          {!portfolio || portfolio.transactions.length === 0 ? (
-            <div className="p-6 text-sm text-gray-400">No transactions yet.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-190 text-sm">
-                <thead className="text-xs text-gray-500">
-                  <tr>
-                    <th className="text-left px-4 py-3">Time</th>
-                    <th className="text-left px-4 py-3">Stock</th>
-                    <th className="text-center px-4 py-3">Side</th>
-                    <th className="text-right px-4 py-3">Qty</th>
-                    <th className="text-right px-4 py-3">Price</th>
-                    <th className="text-right px-4 py-3">Value</th>
-                    <th className="text-right px-4 py-3">Realized</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {portfolio.transactions.map((t) => {
-                    const pnlUp = t.realizedPnl >= 0;
-                    return (
-                      <tr key={t.id} className="border-t border-[#1a1a2e]">
-                        <td className="px-4 py-3 text-gray-400">{fmtDate(t.createdAt)}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-white">{t.sym}</div>
-                          <div className="text-xs text-gray-500">{t.name}</div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
+            {!rating ? (
+              <p className="text-sm text-gray-500 py-2">Click "Run Analysis" to get LLM-based insights and heuristic suggestions for your portfolio.</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-border bg-muted/20 p-4 text-center">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Overall Health Score</p>
+                  <p className="text-4xl font-black text-[#f59e0b] tracking-tighter">{rating.score.toFixed(1)}<span className="text-lg text-gray-500 font-medium">/10</span></p>
+                  <p className="text-xs text-gray-300 mt-2 leading-relaxed">{rating.summary}</p>
+                </div>
+
+                {Array.isArray(rating.suggestions) && rating.suggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Key Recommendations</p>
+                    {rating.suggestions.slice(0, 4).map((s, idx) => (
+                      <div key={`${s.symbol}-${idx}`} className="rounded-xl border border-border bg-background p-3 flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-white">{s.symbol || 'PORTFOLIO'}</span>
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              t.side === 'BUY'
-                                ? 'bg-[#10b981]/20 text-[#22c55e]'
-                                : 'bg-[#ef4444]/20 text-[#ef4444]'
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                              s.action === 'BUY'
+                                ? 'bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20'
+                                : s.action === 'SELL'
+                                  ? 'bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/20'
+                                  : 'bg-muted text-gray-300 border border-border'
                             }`}
                           >
-                            {t.side === 'BUY' ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                            {t.side}
+                            {s.action}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-200">{qty(t.quantity)}</td>
-                        <td className="px-4 py-3 text-right text-gray-200">{money(t.price)}</td>
-                        <td className="px-4 py-3 text-right text-gray-200">{money(t.totalValue)}</td>
-                        <td className={`px-4 py-3 text-right font-semibold ${pnlUp ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-                          {pnlUp ? '+' : ''}{money(t.realizedPnl)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="xl:col-span-4 rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-[#38bdf8]" />
-            <h3 className="text-sm font-semibold">Top Allocation</h3>
+                        </div>
+                        <p className="text-xs text-gray-400 leading-relaxed mt-1">{s.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-
-          {allocation.length === 0 ? (
-            <p className="text-sm text-gray-500">Allocation appears when you have holdings.</p>
-          ) : (
-            <div className="space-y-2.5">
-              {allocation.map((a) => (
-                <div key={a.sym}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-300">{a.sym}</span>
-                    <span className="text-gray-500">{a.pct.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-[#111528] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-linear-to-r from-[#10b981] via-[#22c55e] to-[#38bdf8]"
-                      style={{ width: `${Math.max(4, Math.min(100, a.pct))}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -731,7 +795,7 @@ function MetricCard({
   positive?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-[#1a1a2e] bg-[#0c0c18] p-4">
+    <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs text-gray-500 uppercase tracking-wider">{title}</div>
         {icon}

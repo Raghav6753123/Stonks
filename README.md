@@ -56,3 +56,31 @@ npx vercel --prod
 - 500 on auth routes: verify JWT and Firebase admin variables.
 - DB connection errors: verify host/port/user/password and DB network access.
 - Empty market/news data: verify provider keys and daily limits.
+
+## 8) Running the Local ML Service
+
+This project includes a Python FastAPI microservice for end-of-day stock predictions (`/predict/eod`), keeping heavy ML dependencies separate from Node.js.
+
+### Setup
+1. Open a terminal and navigate to the `ml_service` folder.
+2. (Optional) Create a virtual environment: `python -m venv venv` and activate it (e.g. `venv\Scripts\activate`).
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Running
+Start the Python service on port 8001:
+```bash
+cd ml_service
+uvicorn app.main:app --port 8001 --reload
+```
+Next.js API routes (like `/api/predict/eod`) are configured to automatically forward requests to `http://127.0.0.1:8001`.
+
+### Testing
+Once both Next.js (`npm run dev`) and the ML service are running, you can test the prediction API:
+```bash
+curl -X POST http://localhost:3000/api/predict/eod \
+  -H "Content-Type: application/json" \
+  -d "{\"ticker\":\"AAPL\"}"
+```

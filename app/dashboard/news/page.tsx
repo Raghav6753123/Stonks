@@ -52,7 +52,7 @@ export default function NewsPage() {
     <>
       {/* header */}
       <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="p-2 rounded-xl bg-[#1a1a2e] border border-[#2a2a3e] text-gray-400 hover:text-white transition-all">
+        <Link href="/dashboard" className="p-2 rounded-xl bg-muted border border-border text-gray-400 hover:text-white transition-all">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1">
@@ -65,11 +65,11 @@ export default function NewsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-48 rounded-2xl border border-[#1a1a2e] bg-[#0f0f1a] animate-pulse" />
+            <div key={i} className="h-48 rounded-2xl border border-border bg-card animate-pulse" />
           ))}
         </div>
       ) : news.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#2a2a3e] bg-[#0f0f1a]/50 p-14 text-center">
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-14 text-center">
           <Newspaper className="w-8 h-8 text-gray-700 mx-auto mb-3" />
           <p className="text-sm text-gray-400">No news available</p>
         </div>
@@ -107,8 +107,8 @@ function NewsFullCard({
 
   return (
     <div
-      className={`group rounded-2xl border bg-[#0c0c18] transition-all duration-200 overflow-hidden
-        ${isExpanded ? 'border-[#2a2a3e] ring-1 ring-[#2a2a3e]/50' : 'border-[#1a1a2e] hover:border-[#2a2a3e]'}`}
+      className={`group rounded-2xl border bg-card transition-all duration-200 overflow-hidden
+        ${isExpanded ? 'border-border ring-1 ring-[#2a2a3e]/50' : 'border-border hover:border-border'}`}
     >
       {/* accent strip */}
       <div className="h-0.75" style={{ background: `linear-gradient(90deg, ${impactColor}80, ${impactColor}20, transparent)` }} />
@@ -167,7 +167,7 @@ function NewsFullCard({
 
       {/* expanded section */}
       {isExpanded && (
-        <div className="border-t border-[#1a1a2e] bg-[#0a0a14] px-5 py-4 space-y-3">
+        <div className="border-t border-border bg-[#0a0a14] px-5 py-4 space-y-3">
           {item.description ? (
             <p className="text-sm text-gray-400 leading-relaxed">{item.description}</p>
           ) : (
