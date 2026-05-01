@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Brain, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { Brain, Send, Loader2, ArrowLeft, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 type ChatMessage = {
@@ -44,6 +44,7 @@ const SUGGESTED = [
 ];
 
 const SESSION_KEY = 'stonks_ai_session_id';
+const RECENT_SESSIONS_KEY = 'stonks_ai_recent_sessions';
 const CHAT_REQUEST_TIMEOUT_MS = 610000;
 
 export default function AiChatPage() {
@@ -53,19 +54,34 @@ export default function AiChatPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState('');
+  const [recentSessions, setRecentSessions] = useState<{id: string, date: string}[]>([]);
   const [maxMessages, setMaxMessages] = useState(40);
 
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const existing = localStorage.getItem(SESSION_KEY);
-    if (existing) {
-      setSessionId(existing);
-      return;
+    let history: {id: string, date: string}[] = [];
+    try {
+      const stored = localStorage.getItem(RECENT_SESSIONS_KEY);
+      if (stored) history = JSON.parse(stored);
+    } catch {}
+
+    const oldSession = localStorage.getItem(SESSION_KEY);
+    if (history.length === 0 && oldSession) {
+      history = [{ id: oldSession, date: new Date().toISOString() }];
+      localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(history));
     }
-    const next = makeId();
-    localStorage.setItem(SESSION_KEY, next);
-    setSessionId(next);
+
+    if (history.length > 0) {
+      setRecentSessions(history);
+      setSessionId(history[0].id);
+    } else {
+      const next = makeId();
+      history = [{ id: next, date: new Date().toISOString() }];
+      localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(history));
+      setRecentSessions(history);
+      setSessionId(next);
+    }
   }, []);
 
   useEffect(() => {
@@ -121,8 +137,19 @@ export default function AiChatPage() {
 
   function startNewChat() {
     const next = makeId();
-    localStorage.setItem(SESSION_KEY, next);
+    const newSession = { id: next, date: new Date().toISOString() };
+    const updated = [newSession, ...recentSessions].slice(0, 5);
+    localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(updated));
+    setRecentSessions(updated);
     setSessionId(next);
+    setMessages([]);
+    setInput('');
+    setError(null);
+  }
+
+  function switchChat(id: string) {
+    if (id === sessionId) return;
+    setSessionId(id);
     setMessages([]);
     setInput('');
     setError(null);
@@ -195,18 +222,49 @@ export default function AiChatPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard" className="p-2 rounded-xl bg-muted border border-border text-gray-400 hover:text-white transition-all">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Brain className="w-5 h-5 text-[#10b981]" />
-            AI Chat
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Reads stock + chat memory from Chroma on every prompt</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="p-2 rounded-xl bg-muted border border-border text-gray-400 hover:text-white transition-all">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Brain className="w-5 h-5 text-[#10b981]" />
+              AI Chat
+            </h1>
+            <p className="text-xs text-gray-500 mt-0.5">Reads stock + chat memory from Chroma on every prompt</p>
+          </div>
         </div>
+        <button
+          onClick={startNewChat}
+          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5 whitespace-nowrap"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          New Chat
+        </button>
       </div>
+
+      {recentSessions.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <span className="text-xs font-medium text-muted-foreground mr-1 whitespace-nowrap">Recent:</span>
+          {recentSessions.map((s, i) => {
+            const num = recentSessions.length - i;
+            return (
+              <button
+                key={s.id}
+                onClick={() => switchChat(s.id)}
+                className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-all border ${
+                  s.id === sessionId 
+                    ? 'bg-primary text-primary-foreground border-primary font-medium' 
+                    : 'bg-muted border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Chat {num}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div ref={listRef} className="h-[60vh] overflow-y-auto p-4 space-y-3">
