@@ -16,12 +16,21 @@ import {
 
 loadServerEnvOnce();
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const GEMINI_MODEL = 'gemini-3-flash-preview';
 const MAX_SESSION_MESSAGES = Number(process.env.AI_CHAT_SESSION_MESSAGE_LIMIT || 40);
 const STOCKS_FETCH_TIMEOUT_MS = Number(process.env.AI_STOCKS_FETCH_TIMEOUT_MS || 12000);
 const NEWS_FETCH_TIMEOUT_MS = Number(process.env.AI_NEWS_FETCH_TIMEOUT_MS || 12000);
-const CHROMA_TIMEOUT_MS = Number(process.env.AI_CHROMA_TIMEOUT_MS || 10000);
-const AI_INFER_TIMEOUT_MS = Number(process.env.AI_INFER_TIMEOUT_MS || 30000);
+const CHROMA_TIMEOUT_MS = 1500; // Force fast timeout so it doesn't hang if Chroma is down
+const AI_INFER_TIMEOUT_MS = Number(process.env.AI_INFER_TIMEOUT_MS || 60000);
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8001';
+const CHAT_MODEL_PROVIDER = 'gemini';
+const CHAT_MODEL_ENABLE_FALLBACK = process.env.CHAT_MODEL_ENABLE_FALLBACK === 'true';
+
+const HF_STOCK_MODEL_ENABLED = process.env.HF_STOCK_MODEL_ENABLED === 'true';
+const HF_STOCK_MODEL_URL = process.env.HF_STOCK_MODEL_URL || 'https://raghav6753-chatbot.hf.space';
+const HF_STOCK_MODEL_API_NAME = process.env.HF_STOCK_MODEL_API_NAME || 'answer';
+const HF_STOCK_MODEL_TIMEOUT_MS = Number(process.env.HF_STOCK_MODEL_TIMEOUT_MS || 120000);
+const HF_TOKEN = process.env.HF_TOKEN || '';
 
 let aiChainPromise = null;
 
@@ -130,7 +139,7 @@ function getAiChain() {
       apiKey,
       model: GEMINI_MODEL,
       temperature: 0.25,
-      maxOutputTokens: 700,
+      maxOutputTokens: 4000,
       topP: 0.9,
     });
 
@@ -138,6 +147,7 @@ function getAiChain() {
 You are Stonks AI assistant for a stock dashboard.
 Use only the provided database context for stock data; if data is missing, say so clearly.
 Keep answers concise and actionable.
+IMPORTANT: Format your response using clean, readable bullet points. DO NOT use markdown tables under any circumstances. Use **bold** text for emphasis and stock tickers.
 
 === STOCK DB CONTEXT ===
 {stockContext}
@@ -189,6 +199,94 @@ async function callGeminiWithLangChain({ userPrompt, stockDocs, newsDocs, chatDo
   );
 
   return String(text || '').trim() || 'I could not generate a response from the available data.';
+}
+
+async function callLocalChatService({ userPrompt, stockDocs, newsDocs, chatDocs }) {
+  console.log("Routing local chat request directly to Gemini API...");
+  return await callGeminiWithLangChain({ userPrompt, stockDocs, newsDocs, chatDocs });
+}
+
+async function callHFStockModel({ previousChat, stockData, newsData, question }) {
+  const baseUrl = HF_STOCK_MODEL_URL;
+
+  // Step 1: POST to initiate request and get event_id
+  const postRes = await fetch(`${baseUrl}/gradio_api/call/${HF_STOCK_MODEL_API_NAME}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(HF_TOKEN ? { 'Authorization': `Bearer ${HF_TOKEN}` } : {})
+    },
+    body: JSON.stringify({
+      data: [previousChat || '', stockData || '', newsData || '', question || '']
+    })
+  });
+
+  if (!postRes.ok) {
+    throw new Error(`HF POST failed: ${postRes.status} ${postRes.statusText}`);
+  }
+
+  const postJson = await postRes.json();
+  const eventId = postJson.event_id;
+
+  if (!eventId) {
+    throw new Error('HF response did not include event_id');
+  }
+
+  // Step 2: GET to poll for result (SSE)
+  const getRes = await fetch(`${baseUrl}/gradio_api/call/${HF_STOCK_MODEL_API_NAME}/${eventId}`, {
+    headers: {
+      ...(HF_TOKEN ? { 'Authorization': `Bearer ${HF_TOKEN}` } : {})
+    }
+  });
+
+  if (!getRes.ok) {
+    throw new Error(`HF result fetch failed: ${getRes.status} ${getRes.statusText}`);
+  }
+
+  const sseText = await getRes.text();
+
+  // The response is SSE. We look for the final data line.
+  const lines = sseText.split('\n');
+  const dataLines = lines.filter((line) => line.startsWith('data: '));
+  
+  if (dataLines.length === 0) {
+    throw new Error('HF SSE response did not contain any data lines');
+  }
+
+  // Gradio sends multiple generating events, the last one has the complete response
+  const dataLine = dataLines[dataLines.length - 1];
+
+  try {
+    const jsonStr = dataLine.replace('data: ', '');
+    
+    // If the space returns an error, it might look like {"error": "..."}
+    if (jsonStr.includes('"error"')) {
+       try {
+         const errObj = JSON.parse(jsonStr);
+         if (errObj.error) throw new Error(errObj.error);
+       } catch (e) {
+         if (e.message !== 'Unexpected token') throw e;
+       }
+    }
+
+    const parsed = JSON.parse(jsonStr);
+    let answer = Array.isArray(parsed) ? parsed[0] : parsed;
+
+    if (!answer || typeof answer !== 'string') {
+      throw new Error(`HF returned invalid or empty answer: ${JSON.stringify(parsed)}`);
+    }
+
+    // Remove <think>...</think> tags if present
+    answer = answer.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+    if (!answer) {
+      throw new Error('HF returned empty answer after cleanup');
+    }
+
+    return answer;
+  } catch (e) {
+    throw new Error(`Failed to parse HF response: ${e.message}`);
+  }
 }
 
 export async function GET(req) {
@@ -259,12 +357,103 @@ export async function POST(req) {
       CHROMA_TIMEOUT_MS,
       'Context query'
     );
-    const answer = await callGeminiWithLangChain({
-      userPrompt: prompt,
-      stockDocs,
-      newsDocs,
-      chatDocs: context.chats,
-    });
+
+    let answer;
+    let usedProvider = CHAT_MODEL_PROVIDER;
+
+    try {
+      if (CHAT_MODEL_PROVIDER === 'local_finetuned') {
+        try {
+          answer = await withTimeout(
+            callLocalChatService({
+              userPrompt: prompt,
+              stockDocs,
+              newsDocs,
+              chatDocs: context.chats,
+            }),
+            AI_INFER_TIMEOUT_MS,
+            'Local AI inference'
+          );
+        } catch (localError) {
+          console.error('Local fine-tuned chat model failed:', localError.message);
+          // Fallback to true if undefined
+          const shouldFallback = process.env.CHAT_MODEL_ENABLE_FALLBACK !== 'false';
+          if (shouldFallback) {
+            console.log('Falling back to Gemini...');
+            usedProvider = 'gemini';
+            try {
+              answer = await callGeminiWithLangChain({
+                userPrompt: prompt,
+                stockDocs,
+                newsDocs,
+                chatDocs: context.chats,
+              });
+            } catch (geminiError) {
+              console.error('Gemini fallback also failed:', geminiError.message);
+              throw new Error(`Both primary model and Gemini fallback failed. Primary error: ${localError.message}`);
+            }
+          } else {
+            throw localError;
+          }
+        }
+      } else if (CHAT_MODEL_PROVIDER === 'huggingface') {
+        try {
+          const stockContext = stockDocs.length
+            ? stockDocs.map((s) => s.document).join('\n')
+            : 'No stock data available.';
+
+          const newsContext = newsDocs.length
+            ? newsDocs.map((n) => n.document).join('\n')
+            : 'No news data available.';
+
+          const chatContext = context.chats.length
+            ? context.chats.map((c) => c.document).join('\n')
+            : 'No previous chat history.';
+
+          answer = await withTimeout(
+            callHFStockModel({
+              previousChat: chatContext,
+              stockData: stockContext,
+              newsData: newsContext,
+              question: prompt,
+            }),
+            HF_STOCK_MODEL_TIMEOUT_MS,
+            'Hugging Face AI inference'
+          );
+        } catch (hfError) {
+          console.error('Hugging Face fine-tuned chat model failed:', hfError.message);
+          // Fallback to true if undefined
+          const shouldFallback = process.env.CHAT_MODEL_ENABLE_FALLBACK !== 'false';
+          if (shouldFallback) {
+            console.log('Falling back to Gemini...');
+            usedProvider = 'gemini';
+            try {
+              answer = await callGeminiWithLangChain({
+                userPrompt: prompt,
+                stockDocs,
+                newsDocs,
+                chatDocs: context.chats,
+              });
+            } catch (geminiError) {
+              console.error('Gemini fallback also failed:', geminiError.message);
+              throw new Error(`Both primary model and Gemini fallback failed. Primary error: ${hfError.message}`);
+            }
+          } else {
+            throw hfError;
+          }
+        }
+      } else {
+        answer = await callGeminiWithLangChain({
+          userPrompt: prompt,
+          stockDocs,
+          newsDocs,
+          chatDocs: context.chats,
+        });
+      }
+    } catch (chatError) {
+      throw chatError;
+    }
+
     await withTimeout(storeChatTurn({ sessionId, prompt, answer }), CHROMA_TIMEOUT_MS, 'Store chat turn');
 
     return NextResponse.json(
@@ -276,7 +465,8 @@ export async function POST(req) {
           stockMatches: stockDocs.length,
           newsMatches: newsDocs.length,
           memoryMatches: context.chats.length,
-          model: GEMINI_MODEL,
+          model: usedProvider === 'gemini' ? GEMINI_MODEL : (usedProvider === 'huggingface' ? 'hf-fine-tuned' : 'local_finetuned'),
+          provider: usedProvider,
           sessionLimit: MAX_SESSION_MESSAGES,
           messageCount: history.length + 2,
           timestamp: new Date().toISOString(),

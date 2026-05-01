@@ -1,5 +1,7 @@
 import { ChromaClient } from 'chromadb';
 import { loadServerEnvOnce } from './loadEnv';
+import fs from 'fs';
+import path from 'path';
 
 loadServerEnvOnce();
 
@@ -21,6 +23,36 @@ const fallbackStore = {
   chatsBySession: new Map(), // sessionId -> [{ id, document, metadata }]
   portfolio: new Map(), // userId -> { document, metadata }
 };
+
+const FALLBACK_DB_PATH = path.join(process.cwd(), '.stonks_fallback_db.json');
+
+function loadFallbackDb() {
+  try {
+    if (fs.existsSync(FALLBACK_DB_PATH)) {
+      const data = JSON.parse(fs.readFileSync(FALLBACK_DB_PATH, 'utf-8'));
+      if (data.chatsBySession) {
+        for (const [k, v] of Object.entries(data.chatsBySession)) {
+          fallbackStore.chatsBySession.set(k, v);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load fallback db", e);
+  }
+}
+
+function saveFallbackDb() {
+  try {
+    const data = {
+      chatsBySession: Object.fromEntries(fallbackStore.chatsBySession),
+    };
+    fs.writeFileSync(FALLBACK_DB_PATH, JSON.stringify(data), 'utf-8');
+  } catch (e) {
+    console.error("Failed to save fallback db", e);
+  }
+}
+
+loadFallbackDb();
 
 function reqEnv(name) {
   const value = process.env[name];
@@ -194,6 +226,7 @@ function fallbackStoreChat({ sessionId, prompt, answer }) {
   });
 
   fallbackStore.chatsBySession.set(session, list);
+  saveFallbackDb();
 }
 
 function makeNewsId(item, i) {

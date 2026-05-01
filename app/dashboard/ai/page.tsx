@@ -9,6 +9,7 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   text: string;
   createdAt: string;
+  meta?: any;
 };
 
 function makeId() {
@@ -16,6 +17,23 @@ function makeId() {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function FormattedText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="text-foreground font-semibold">{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+          return <em key={i} className="text-foreground italic">{part.slice(1, -1)}</em>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 const SUGGESTED = [
@@ -26,7 +44,7 @@ const SUGGESTED = [
 ];
 
 const SESSION_KEY = 'stonks_ai_session_id';
-const CHAT_REQUEST_TIMEOUT_MS = 35000;
+const CHAT_REQUEST_TIMEOUT_MS = 610000;
 
 export default function AiChatPage() {
   const [input, setInput] = useState('');
@@ -158,6 +176,7 @@ export default function AiChatPage() {
         role: 'assistant',
         text: String(data?.answer || 'No response generated.'),
         createdAt: new Date().toISOString(),
+        meta: data?.meta,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -228,7 +247,15 @@ export default function AiChatPage() {
                       : 'bg-muted border-border text-foreground'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{m.text}</p>
+                  <div className="whitespace-pre-wrap"><FormattedText text={m.text} /></div>
+                  {m.meta && (
+                    <div className="mt-2 pt-2 border-t border-border text-[10px] text-gray-500 flex flex-wrap gap-2">
+                      <span className="bg-background/50 px-1.5 py-0.5 rounded">Stocks context: {m.meta.stockMatches}</span>
+                      <span className="bg-background/50 px-1.5 py-0.5 rounded">News context: {m.meta.newsMatches}</span>
+                      <span className="bg-background/50 px-1.5 py-0.5 rounded">Memory: {m.meta.memoryMatches}</span>
+                      <span className="bg-background/50 px-1.5 py-0.5 rounded">Model: {m.meta.model}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
