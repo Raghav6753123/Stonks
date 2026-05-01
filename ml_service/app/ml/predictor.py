@@ -6,8 +6,7 @@ import joblib
 
 from tensorflow.keras.models import load_model
 
-BASE_DIR = os.path.dirname(__file__)
-MODEL_DIR = os.path.join(BASE_DIR, "models")
+MODEL_DIR = r"c:\Users\ragha\OneDrive\Desktop\DBMS\models\price"
 
 SUPPORTED_TICKERS = {
     "AAPL": {
@@ -27,9 +26,14 @@ def add_features(df):
 
     df["return_1"] = df["Close"].pct_change()
     df["return_3"] = df["Close"].pct_change(3)
+    
     df["range"] = (df["High"] - df["Low"]) / df["Close"]
     df["open_close"] = (df["Close"] - df["Open"]) / df["Open"]
+    
     df["volume_change"] = df["Volume"].pct_change()
+
+    df["hour"] = df.index.hour
+    df["minute"] = df.index.minute
 
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna()
